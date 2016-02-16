@@ -46,14 +46,8 @@ public class Ncc {
             logLevel = config.getString("log.level");
             logFile = config.getString("log.file");
 
-            logger.info(config.getString("module.radius"));
-
             moduleRadius = Boolean.valueOf(config.getString("module.radius"));
             moduleDHCP = Boolean.valueOf(config.getString("module.dhcp"));
-
-            logger.info(moduleRadius);
-
-            moduleRadius = true;
 
             logger.setLevel(Level.toLevel(logLevel));
 
@@ -100,10 +94,6 @@ public class Ncc {
             nccDhcp.start();
         }
 
-        logger.info("Starting API");
-        nccAPI = new NccAPI();
-        nccAPI.start();
-
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
                 logger.info("Stopping NCC server...");
@@ -113,8 +103,8 @@ public class Ncc {
             }
         });
 
-        while (true) {
-            TimeUnit.SECONDS.sleep(1);
-        }
+        logger.info("Starting API");
+        nccAPI = new NccAPI();
+        nccAPI.start();
     }
 }

@@ -138,7 +138,6 @@ public abstract class RadiusServer {
 	 * Stops the server and closes the sockets.
 	 */
 	public void stop() {
-		logger.info("stopping Radius server");
 		closing = true;
 		if (authSocket != null)
 			authSocket.close();
