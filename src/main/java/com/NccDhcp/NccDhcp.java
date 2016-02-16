@@ -32,7 +32,6 @@ public class NccDhcp {
 
         DhcpServer dhcpServer = new DhcpServer(nccLeaseManager);
         try {
-            logger.info("Starting NccDhcp server");
             dhcpServer.addDefaultInterfaces();
             dhcpServer.addInterface(InterfaceAddress.forString("93.170.48.5"));
             dhcpServer.start();

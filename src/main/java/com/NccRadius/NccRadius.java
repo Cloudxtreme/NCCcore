@@ -70,8 +70,6 @@ public class NccRadius extends RadiusServer {
     public NccRadius() {
         super();
 
-        logger.info("NccRadius starting");
-
         CompositeConfiguration config = new CompositeConfiguration();
 
         try {
@@ -105,8 +103,6 @@ public class NccRadius extends RadiusServer {
 
         setAuthPort(radAuthPort);
         setAcctPort(radAcctPort);
-
-        start(true, true);
     }
 
     public RadiusPacket accountingRequestReceived(AccountingRequest accountingRequest, InetSocketAddress client) {

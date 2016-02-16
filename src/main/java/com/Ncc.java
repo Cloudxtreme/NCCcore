@@ -4,10 +4,7 @@ import com.NccAPI.NccAPI;
 import com.NccDhcp.NccDhcp;
 import com.NccRadius.NccRadius;
 import com.NccSystem.SQL.NccSQLPool;
-import org.apache.commons.configuration.CompositeConfiguration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.configuration.SystemConfiguration;
+import org.apache.commons.configuration.*;
 import org.apache.log4j.*;
 import org.apache.log4j.jmx.LoggerDynamicMBean;
 
@@ -29,6 +26,8 @@ public class Ncc {
 
     public static void main(String[] args) throws InterruptedException, SQLException, IOException {
 
+        boolean moduleRadius = true, moduleDHCP = true;
+
         logger.setLevel(Level.toLevel(logLevel));
 
         String dbHost, dbDbname, dbUser, dbPassword;
@@ -46,6 +45,15 @@ public class Ncc {
 
             logLevel = config.getString("log.level");
             logFile = config.getString("log.file");
+
+            logger.info(config.getString("module.radius"));
+
+            moduleRadius = Boolean.valueOf(config.getString("module.radius"));
+            moduleDHCP = Boolean.valueOf(config.getString("module.dhcp"));
+
+            logger.info(moduleRadius);
+
+            moduleRadius = true;
 
             logger.setLevel(Level.toLevel(logLevel));
 
@@ -75,19 +83,26 @@ public class Ncc {
 
         } catch (ConfigurationException ce) {
             logger.fatal("Config file missing");
-            System.out.println("Config file missing in "+current);
+            System.out.println("Config file missing in " + current);
             System.exit(-1);
         }
 
 
+        if (moduleRadius) {
+            logger.info("Starting Radius");
+            nccRadius = new NccRadius();
+            nccRadius.start(true, true);
+        }
+
+        if (moduleDHCP) {
+            logger.info("Starting DHCP");
+            nccDhcp = new NccDhcp();
+            nccDhcp.start();
+        }
+
+        logger.info("Starting API");
         nccAPI = new NccAPI();
-        nccRadius = new NccRadius();
-        nccDhcp = new NccDhcp();
-
-        nccDhcp.start();
-
         nccAPI.start();
-        nccRadius.start(true, true);
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
