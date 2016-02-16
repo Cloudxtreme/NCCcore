@@ -51,7 +51,7 @@ public class NccAPI {
                     response.setContentType(JSONRPC_RESPONSE_CONTENT_TYPE);
 
                     // setup streams
-                    InputStream input 	= null;
+                    InputStream input;
                     OutputStream output	= response.getOutputStream();
 
                     // POST
@@ -148,7 +148,6 @@ public class NccAPI {
 
                 switch (target) {
                     case "/api":
-                        logger.info("method="+request.getMethod());
                         compositeServer.handleCORS(request, response);
                         break;
                     default:
