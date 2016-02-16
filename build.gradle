@@ -1,0 +1,24 @@
+group 'ru.nccsystems'
+version '1.0-SNAPSHOT'
+
+apply plugin: 'java'
+apply plugin: 'application'
+
+sourceCompatibility = 7
+
+dependencies {
+    compile fileTree(dir: 'lib', include: '*.jar')
+}
+
+jar {
+    manifest {
+        attributes(
+                'Class-Path': configurations.compile.collect { it.getName() }.join(' '),
+                'Main-Class': 'com.Ncc'
+        )
+    }
+
+    from configurations.compile.collect { entry -> zipTree(entry) }
+}
+
+mainClassName = 'com.Ncc'
