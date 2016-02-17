@@ -8,45 +8,40 @@ import java.util.ArrayList;
 public interface AstraManagerService {
     public AstraManagerImpl.RunData runTransponder(Integer id);
 
-    public ArrayList<ServerData> getAstraServers();
-
-    public ArrayList<Integer> createServer(Long serverIP,
+    public ArrayList<Integer> createAstraServer(Long serverIP,
                                            String serverSecret,
                                            Long serverLocalAddress,
                                            String serverComment,
                                            String serverName);
 
-    public ArrayList<Integer> deleteServer(Integer id);
+    public ArrayList<ServerData> getAstraServers();
 
-    public ArrayList<Integer> updateServer(Integer id,
+    public ArrayList<Integer> updateAstraServer(Integer id,
                                            Long serverIP,
                                            String serverSecret,
                                            Long serverLocalAddress,
                                            String serverComment,
                                            String serverName);
 
-    public ArrayList<AdapterData> getAstraAdapters();
+    public ArrayList<Integer> deleteAstraServer(Integer id);
 
-    public ArrayList<AdapterData> getAstraAdaptersByServerId(Integer id);
-
-    public ArrayList<CamData> getAstraCam();
-
-    public ArrayList<Integer> createAdapter(Integer adapterDevice,
+    public ArrayList<Integer> createAstraAdapter(Integer adapterDevice,
                                             Integer adapterType,
                                             Integer serverId,
                                             String adapterComment);
 
-    public ArrayList<Integer> deleteAdapter(Integer id);
+    public ArrayList<AdapterData> getAstraAdapters();
 
-    public ArrayList<Integer> updateAdapter(Integer id,
+    public ArrayList<AdapterType> getAstraAdapterTypes();
+    public ArrayList<AdapterData> getAstraAdaptersByServerId(Integer id);
+
+    public ArrayList<Integer> updateAstraAdapter(Integer id,
                                             Integer adapterDevice,
                                             Integer adapterType,
                                             Integer serverId,
                                             String adapterComment);
 
-    public ArrayList<AdapterType> getAstraAdapterTypes();
-
-    public ArrayList<TransponderData> getAstraTransponders();
+    public ArrayList<Integer> deleteAstraAdapter(Integer id);
 
     public ArrayList<Integer> createAstraTransponder(String transponderName,
                                                      Integer transponderFreq,
@@ -58,7 +53,7 @@ public interface AstraManagerService {
                                                      String transponderLNB,
                                                      String transponderSat);
 
-    public ArrayList<Integer> deleteAstraTransponder(Integer id);
+    public ArrayList<TransponderData> getAstraTransponders();
 
     public ArrayList<Integer> updateAstraTransponder(Integer id,
                                                      String transponderName,
@@ -71,6 +66,8 @@ public interface AstraManagerService {
                                                      String transponderLNB,
                                                      String transponderSat);
 
+    public ArrayList<Integer> deleteAstraTransponder(Integer id);
+
     public ArrayList<Integer> createAstraCam(String camServer,
                                              Integer camPort,
                                              String camUser,
@@ -78,7 +75,7 @@ public interface AstraManagerService {
                                              String camName,
                                              String camKey);
 
-    public ArrayList<Integer> deleteAstraCam(Integer id);
+    public ArrayList<CamData> getAstraCams();
 
     public ArrayList<Integer> updateAstraCam(Integer id,
                                              String camServer,
@@ -87,4 +84,7 @@ public interface AstraManagerService {
                                              String camPassword,
                                              String camName,
                                              String camKey);
+
+    public ArrayList<Integer> deleteAstraCam(Integer id);
+
 }

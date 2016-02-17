@@ -70,6 +70,8 @@ public class Ncc {
 
             logger.debug("Got SQL config");
 
+            logger.info("Init SQL pool: " + dbUser + "@" + dbHost);
+
             connectString = "jdbc:mysql://" + dbHost + ":" + dbPort + "/" + dbDbname + "?useUnicode=yes&characterEncoding=UTF-8";
             sqlPool = new NccSQLPool(connectString, dbUser, dbPassword);
 

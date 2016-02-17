@@ -142,13 +142,13 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.getTransponders();
     }
 
-    public ArrayList<CamData> getAstraCam(){
+    public ArrayList<CamData> getAstraCams(){
         NccAstraManager astraManager = new NccAstraManager();
 
         return astraManager.getCams();
     }
 
-    public ArrayList<Integer> createServer(Long serverIP,
+    public ArrayList<Integer> createAstraServer(Long serverIP,
                                            String serverSecret,
                                            Long serverLocalAddress,
                                            String serverComment,
@@ -166,7 +166,7 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.createServer(serverData);
     }
 
-    public ArrayList<Integer> createAdapter(Integer adapterDevice,
+    public ArrayList<Integer> createAstraAdapter(Integer adapterDevice,
                                             Integer adapterType,
                                             Integer serverId,
                                             String adapterComment){
@@ -226,13 +226,13 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.createCam(camData);
     }
 
-    public ArrayList<Integer> deleteServer(Integer id){
+    public ArrayList<Integer> deleteAstraServer(Integer id){
         NccAstraManager astraManager = new NccAstraManager();
 
         return astraManager.deleteServer(id);
     }
 
-    public ArrayList<Integer> deleteAdapter(Integer id){
+    public ArrayList<Integer> deleteAstraAdapter(Integer id){
         NccAstraManager astraManager = new NccAstraManager();
 
         return astraManager.deleteAdapter(id);
@@ -250,7 +250,7 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.deleteCam(id);
     }
 
-    public ArrayList<Integer> updateServer(Integer id, Long serverIP, String serverSecret, Long serverLocalAddress, String serverComment, String serverName){
+    public ArrayList<Integer> updateAstraServer(Integer id, Long serverIP, String serverSecret, Long serverLocalAddress, String serverComment, String serverName){
         NccAstraManager astraManager = new NccAstraManager();
 
         ServerData serverData = new ServerData();
@@ -265,7 +265,7 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.updateServer(serverData);
     }
 
-    public ArrayList<Integer> updateAdapter(Integer id, Integer adapterDevice, Integer adapterType, Integer serverId, String adapterComment){
+    public ArrayList<Integer> updateAstraAdapter(Integer id, Integer adapterDevice, Integer adapterType, Integer serverId, String adapterComment){
         NccAstraManager astraManager = new NccAstraManager();
 
         AdapterData adapterData = new AdapterData();
