@@ -112,47 +112,48 @@ public class AstraManagerImpl implements AstraManagerService {
         return runData;
     }
 
-    public ArrayList<ServerData> getAstraServers(){
+    public ArrayList<ServerData> getAstraServers(String apiKey) {
         NccAstraManager astraManager = new NccAstraManager();
 
         return astraManager.getServers();
     }
 
-    public ArrayList<AdapterData> getAstraAdapters(){
+    public ArrayList<AdapterData> getAstraAdapters(String apiKey) {
         NccAstraManager astraManager = new NccAstraManager();
 
         return astraManager.getAdapters();
     }
 
-    public ArrayList<AdapterData> getAstraAdaptersByServerId(Integer id){
+    public ArrayList<AdapterData> getAstraAdaptersByServerId(String apiKey, Integer id) {
         NccAstraManager astraManager = new NccAstraManager();
 
         return astraManager.getAdaptersByServerId(id);
     }
 
-    public ArrayList<AdapterType> getAstraAdapterTypes(){
+    public ArrayList<AdapterType> getAstraAdapterTypes(String apiKey) {
         NccAstraManager astraManager = new NccAstraManager();
 
         return astraManager.getAdapterTypes();
     }
 
-    public ArrayList<TransponderData> getAstraTransponders(){
+    public ArrayList<TransponderData> getAstraTransponders(String apiKey) {
         NccAstraManager astraManager = new NccAstraManager();
 
         return astraManager.getTransponders();
     }
 
-    public ArrayList<CamData> getAstraCams(){
+    public ArrayList<CamData> getAstraCams(String apiKey) {
         NccAstraManager astraManager = new NccAstraManager();
 
         return astraManager.getCams();
     }
 
-    public ArrayList<Integer> createAstraServer(Long serverIP,
-                                           String serverSecret,
-                                           Long serverLocalAddress,
-                                           String serverComment,
-                                           String serverName){
+    public ArrayList<Integer> createAstraServer(String apiKey,
+                                                Long serverIP,
+                                                String serverSecret,
+                                                Long serverLocalAddress,
+                                                String serverComment,
+                                                String serverName) {
 
         NccAstraManager astraManager = new NccAstraManager();
         ServerData serverData = new ServerData();
@@ -166,10 +167,11 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.createServer(serverData);
     }
 
-    public ArrayList<Integer> createAstraAdapter(Integer adapterDevice,
-                                            Integer adapterType,
-                                            Integer serverId,
-                                            String adapterComment){
+    public ArrayList<Integer> createAstraAdapter(String apiKey,
+                                                 Integer adapterDevice,
+                                                 Integer adapterType,
+                                                 Integer serverId,
+                                                 String adapterComment) {
         NccAstraManager astraManager = new NccAstraManager();
         AdapterData adapterData = new AdapterData();
 
@@ -181,7 +183,8 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.createAdapter(adapterData);
     }
 
-    public ArrayList<Integer> createAstraTransponder(String transponderName,
+    public ArrayList<Integer> createAstraTransponder(String apiKey,
+                                                     String transponderName,
                                                      Integer transponderFreq,
                                                      String transponderPolarity,
                                                      String transponderFEC,
@@ -189,7 +192,7 @@ public class AstraManagerImpl implements AstraManagerService {
                                                      String transponderType,
                                                      Integer adapterId,
                                                      String transponderLNB,
-                                                     String transponderSat){
+                                                     String transponderSat) {
         NccAstraManager astraManager = new NccAstraManager();
         TransponderData transponderData = new TransponderData();
 
@@ -206,12 +209,13 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.createTransponder(transponderData);
     }
 
-    public ArrayList<Integer> createAstraCam(String camServer,
+    public ArrayList<Integer> createAstraCam(String apiKey,
+                                             String camServer,
                                              Integer camPort,
                                              String camUser,
                                              String camPassword,
                                              String camName,
-                                             String camKey){
+                                             String camKey) {
 
         NccAstraManager astraManager = new NccAstraManager();
         CamData camData = new CamData();
@@ -226,31 +230,37 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.createCam(camData);
     }
 
-    public ArrayList<Integer> deleteAstraServer(Integer id){
+    public ArrayList<Integer> deleteAstraServer(String apiKey, Integer id) {
         NccAstraManager astraManager = new NccAstraManager();
 
         return astraManager.deleteServer(id);
     }
 
-    public ArrayList<Integer> deleteAstraAdapter(Integer id){
+    public ArrayList<Integer> deleteAstraAdapter(String apiKey, Integer id) {
         NccAstraManager astraManager = new NccAstraManager();
 
         return astraManager.deleteAdapter(id);
     }
 
-    public ArrayList<Integer> deleteAstraTransponder(Integer id){
+    public ArrayList<Integer> deleteAstraTransponder(String apiKey, Integer id) {
         NccAstraManager astraManager = new NccAstraManager();
 
         return astraManager.deleteTransponder(id);
     }
 
-    public ArrayList<Integer> deleteAstraCam(Integer id){
+    public ArrayList<Integer> deleteAstraCam(String apiKey, Integer id) {
         NccAstraManager astraManager = new NccAstraManager();
 
         return astraManager.deleteCam(id);
     }
 
-    public ArrayList<Integer> updateAstraServer(Integer id, Long serverIP, String serverSecret, Long serverLocalAddress, String serverComment, String serverName){
+    public ArrayList<Integer> updateAstraServer(String apiKey,
+                                                Integer id,
+                                                Long serverIP,
+                                                String serverSecret,
+                                                Long serverLocalAddress,
+                                                String serverComment,
+                                                String serverName) {
         NccAstraManager astraManager = new NccAstraManager();
 
         ServerData serverData = new ServerData();
@@ -265,7 +275,12 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.updateServer(serverData);
     }
 
-    public ArrayList<Integer> updateAstraAdapter(Integer id, Integer adapterDevice, Integer adapterType, Integer serverId, String adapterComment){
+    public ArrayList<Integer> updateAstraAdapter(String apiKey,
+                                                 Integer id,
+                                                 Integer adapterDevice,
+                                                 Integer adapterType,
+                                                 Integer serverId,
+                                                 String adapterComment) {
         NccAstraManager astraManager = new NccAstraManager();
 
         AdapterData adapterData = new AdapterData();
@@ -279,7 +294,17 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.updateAdapter(adapterData);
     }
 
-    public ArrayList<Integer> updateAstraTransponder(Integer id, String transponderName, Integer transponderFreq, String transponderPolarity, String transponderFEC, Integer transponderSymbolrate, String transponderType, Integer adapterId, String transponderLNB, String transponderSat){
+    public ArrayList<Integer> updateAstraTransponder(String apiKey,
+                                                     Integer id,
+                                                     String transponderName,
+                                                     Integer transponderFreq,
+                                                     String transponderPolarity,
+                                                     String transponderFEC,
+                                                     Integer transponderSymbolrate,
+                                                     String transponderType,
+                                                     Integer adapterId,
+                                                     String transponderLNB,
+                                                     String transponderSat) {
         NccAstraManager astraManager = new NccAstraManager();
 
         TransponderData transponderData = new TransponderData();
@@ -298,13 +323,14 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.updateTransponder(transponderData);
     }
 
-    public ArrayList<Integer> updateAstraCam(Integer id,
+    public ArrayList<Integer> updateAstraCam(String apiKey,
+                                             Integer id,
                                              String camServer,
                                              Integer camPort,
                                              String camUser,
                                              String camPassword,
                                              String camName,
-                                             String camKey){
+                                             String camKey) {
 
         NccAstraManager astraManager = new NccAstraManager();
         CamData camData = new CamData();
