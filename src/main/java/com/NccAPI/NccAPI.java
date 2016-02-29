@@ -16,6 +16,7 @@ import com.NccAPI.Views.ViewsService;
 import com.NccAPI.Views.ViewsServiceImpl;
 import com.googlecode.jsonrpc4j.JsonRpcServer;
 import com.googlecode.jsonrpc4j.ProxyUtil;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
@@ -175,5 +176,16 @@ public class NccAPI {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public boolean checkPermission(String apiKey, String permission){
+        String login = "admin";
+        String password = "CtrhtnysqGfhjkm";
+
+        String hash = DigestUtils.md5Hex(DigestUtils.md5Hex(login).concat(password));
+
+        if(apiKey.equals(hash)) return true;
+
+        return false;
     }
 }

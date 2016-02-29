@@ -1,6 +1,7 @@
 package com.NccAPI.AstraManager;
 
 import com.Ncc;
+import com.NccAPI.NccAPI;
 import com.NccAstraManager.*;
 import com.NccSystem.NccUtils;
 import com.googlecode.jsonrpc4j.JsonRpcHttpClient;
@@ -40,11 +41,13 @@ public class AstraManagerImpl implements AstraManagerService {
         public Integer status;
     }
 
-    public RunData runTransponder(Integer id) {
+    public RunData runTransponder(String apiKey, Integer id) {
         NccAstraManager astraManager = new NccAstraManager();
         ArrayList<ChannelData> channelData = astraManager.getChannelsByTransponder(id);
         ArrayList<Channel> channels = new ArrayList<>();
         RunData runData = new RunData();
+
+        if(!new NccAPI().checkPermission(apiKey, "permRunTransponder")) return null;
 
         for (ChannelData ch : channelData) {
             Channel channel = new Channel();
@@ -115,11 +118,15 @@ public class AstraManagerImpl implements AstraManagerService {
     public ArrayList<ServerData> getAstraServers(String apiKey) {
         NccAstraManager astraManager = new NccAstraManager();
 
+        if(!new NccAPI().checkPermission(apiKey, "permGetAstraServers")) return null;
+
         return astraManager.getServers();
     }
 
     public ArrayList<AdapterData> getAstraAdapters(String apiKey) {
         NccAstraManager astraManager = new NccAstraManager();
+
+        if(!new NccAPI().checkPermission(apiKey, "permGetAstraAdapters")) return null;
 
         return astraManager.getAdapters();
     }
@@ -127,11 +134,15 @@ public class AstraManagerImpl implements AstraManagerService {
     public ArrayList<AdapterData> getAstraAdaptersByServerId(String apiKey, Integer id) {
         NccAstraManager astraManager = new NccAstraManager();
 
+        if(!new NccAPI().checkPermission(apiKey, "permGetAstraAdaptersByServerId")) return null;
+
         return astraManager.getAdaptersByServerId(id);
     }
 
     public ArrayList<AdapterType> getAstraAdapterTypes(String apiKey) {
         NccAstraManager astraManager = new NccAstraManager();
+
+        if(!new NccAPI().checkPermission(apiKey, "permGetAstraAdapterTypes")) return null;
 
         return astraManager.getAdapterTypes();
     }
@@ -139,11 +150,15 @@ public class AstraManagerImpl implements AstraManagerService {
     public ArrayList<TransponderData> getAstraTransponders(String apiKey) {
         NccAstraManager astraManager = new NccAstraManager();
 
+        if(!new NccAPI().checkPermission(apiKey, "permGetAstraTransponders")) return null;
+
         return astraManager.getTransponders();
     }
 
     public ArrayList<CamData> getAstraCams(String apiKey) {
         NccAstraManager astraManager = new NccAstraManager();
+
+        if(!new NccAPI().checkPermission(apiKey, "permGetAstraCams")) return null;
 
         return astraManager.getCams();
     }
@@ -157,6 +172,8 @@ public class AstraManagerImpl implements AstraManagerService {
 
         NccAstraManager astraManager = new NccAstraManager();
         ServerData serverData = new ServerData();
+
+        if(!new NccAPI().checkPermission(apiKey, "permCreateAstraServer")) return null;
 
         serverData.serverIP = serverIP;
         serverData.serverSecret = serverSecret;
@@ -174,6 +191,8 @@ public class AstraManagerImpl implements AstraManagerService {
                                                  String adapterComment) {
         NccAstraManager astraManager = new NccAstraManager();
         AdapterData adapterData = new AdapterData();
+
+        if(!new NccAPI().checkPermission(apiKey, "permCreateAstraAdapter")) return null;
 
         adapterData.adapterDevice = adapterDevice;
         adapterData.adapterType = adapterType;
@@ -195,6 +214,8 @@ public class AstraManagerImpl implements AstraManagerService {
                                                      String transponderSat) {
         NccAstraManager astraManager = new NccAstraManager();
         TransponderData transponderData = new TransponderData();
+
+        if(!new NccAPI().checkPermission(apiKey, "permCreateAstraTransponder")) return null;
 
         transponderData.transponderName = transponderName;
         transponderData.transponderFreq = transponderFreq;
@@ -220,6 +241,8 @@ public class AstraManagerImpl implements AstraManagerService {
         NccAstraManager astraManager = new NccAstraManager();
         CamData camData = new CamData();
 
+        if(!new NccAPI().checkPermission(apiKey, "permCreateAstraCam")) return null;
+
         camData.camServer = camServer;
         camData.camPort = camPort;
         camData.camUser = camUser;
@@ -230,8 +253,32 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.createCam(camData);
     }
 
+    public ArrayList<Integer> createAstraChannel(String apiKey,
+                                                 String channelName,
+                                                 Integer channelTransponder,
+                                                 Integer channelPnr,
+                                                 Integer channelCam,
+                                                 Long channelIP,
+                                                 String channelComment) {
+
+        NccAstraManager astraManager = new NccAstraManager();
+        ChannelData channelData = new ChannelData();
+
+        if(!new NccAPI().checkPermission(apiKey, "permCreateAstraChannel")) return null;
+
+        channelData.channelName = channelName;
+        channelData.transponderId = channelTransponder;
+        channelData.channelPnr = channelPnr;
+        channelData.camId = channelCam;
+        channelData.channelIP = channelIP;
+
+        return astraManager.createChannel(channelData);
+    }
+
     public ArrayList<Integer> deleteAstraServer(String apiKey, Integer id) {
         NccAstraManager astraManager = new NccAstraManager();
+
+        if(!new NccAPI().checkPermission(apiKey, "permDeleteAstraServer")) return null;
 
         return astraManager.deleteServer(id);
     }
@@ -239,17 +286,23 @@ public class AstraManagerImpl implements AstraManagerService {
     public ArrayList<Integer> deleteAstraAdapter(String apiKey, Integer id) {
         NccAstraManager astraManager = new NccAstraManager();
 
+        if(!new NccAPI().checkPermission(apiKey, "permDeleteAstraAdapter")) return null;
+
         return astraManager.deleteAdapter(id);
     }
 
     public ArrayList<Integer> deleteAstraTransponder(String apiKey, Integer id) {
         NccAstraManager astraManager = new NccAstraManager();
 
+        if(!new NccAPI().checkPermission(apiKey, "permDeleteAstraTransponder")) return null;
+
         return astraManager.deleteTransponder(id);
     }
 
     public ArrayList<Integer> deleteAstraCam(String apiKey, Integer id) {
         NccAstraManager astraManager = new NccAstraManager();
+
+        if(!new NccAPI().checkPermission(apiKey, "permDeleteAstraCam")) return null;
 
         return astraManager.deleteCam(id);
     }
@@ -264,6 +317,8 @@ public class AstraManagerImpl implements AstraManagerService {
         NccAstraManager astraManager = new NccAstraManager();
 
         ServerData serverData = new ServerData();
+
+        if(!new NccAPI().checkPermission(apiKey, "permUpdateAstraServer")) return null;
 
         serverData.id = id;
         serverData.serverIP = serverIP;
@@ -284,6 +339,8 @@ public class AstraManagerImpl implements AstraManagerService {
         NccAstraManager astraManager = new NccAstraManager();
 
         AdapterData adapterData = new AdapterData();
+
+        if(!new NccAPI().checkPermission(apiKey, "permUpdateAstraAdapter")) return null;
 
         adapterData.id = id;
         adapterData.adapterDevice = adapterDevice;
@@ -308,6 +365,8 @@ public class AstraManagerImpl implements AstraManagerService {
         NccAstraManager astraManager = new NccAstraManager();
 
         TransponderData transponderData = new TransponderData();
+
+        if(!new NccAPI().checkPermission(apiKey, "permUpdateAstraTransponder")) return null;
 
         transponderData.id = id;
         transponderData.transponderName = transponderName;
@@ -334,6 +393,8 @@ public class AstraManagerImpl implements AstraManagerService {
 
         NccAstraManager astraManager = new NccAstraManager();
         CamData camData = new CamData();
+
+        if(!new NccAPI().checkPermission(apiKey, "permUpdateAstraCam")) return null;
 
         camData.id = id;
         camData.camServer = camServer;

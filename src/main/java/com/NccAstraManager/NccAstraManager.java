@@ -479,6 +479,31 @@ public class NccAstraManager {
         return null;
     }
 
+    public ArrayList<Integer> createChannel(ChannelData channelData) {
+
+        try {
+            ArrayList<Integer> ids = query.updateQuery("INSERT INTO nccIptvChannels (" +
+                    "channelName," +
+                    "channelPnr," +
+                    "transponderId," +
+                    "camId," +
+                    "channelIP" +
+                    ") VALUES (" +
+                    "'" + channelData.channelName + "', " +
+                    channelData.channelPnr + ", " +
+                    channelData.transponderId + ", " +
+                    channelData.camId + ", " +
+                    channelData.channelIP +
+                    ")");
+
+            return ids;
+        } catch (NccQueryException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
     public ArrayList<Integer> deleteServer(Integer id) {
         try {
             ArrayList<Integer> ids = query.updateQuery("DELETE FROM nccIptvServers WHERE id=" + id);

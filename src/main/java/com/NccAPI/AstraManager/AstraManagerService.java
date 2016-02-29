@@ -6,7 +6,7 @@ import java.nio.channels.Channel;
 import java.util.ArrayList;
 
 public interface AstraManagerService {
-    public AstraManagerImpl.RunData runTransponder(Integer id);
+    public AstraManagerImpl.RunData runTransponder(String apiKey, Integer id);
 
     public ArrayList<ServerData> getAstraServers(String apiKey);
     public ArrayList<AdapterData> getAstraAdapters(String apiKey);
@@ -47,6 +47,13 @@ public interface AstraManagerService {
                                              String camName,
                                              String camKey);
 
+    public ArrayList<Integer> createAstraChannel(String apiKey,
+                                             String channelName,
+                                             Integer channelTransponder,
+                                             Integer channelPnr,
+                                             Integer channelCam,
+                                             Long channelIP,
+                                             String channelComment);
 
     public ArrayList<Integer> updateAstraServer(String apiKey,
                                                 Integer id,
