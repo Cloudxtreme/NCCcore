@@ -14,6 +14,7 @@ public interface AstraManagerService {
     public ArrayList<AdapterData> getAstraAdaptersByServerId(String apiKey, Integer id);
     public ArrayList<TransponderData> getAstraTransponders(String apiKey);
     public ArrayList<CamData> getAstraCams(String apiKey);
+    public ArrayList<ChannelData> getAstraChannels(String apiKey);
 
     public ArrayList<Integer> createAstraServer(String apiKey,
                                                 Long serverIP,
@@ -92,9 +93,18 @@ public interface AstraManagerService {
                                              String camName,
                                              String camKey);
 
+    public ArrayList<Integer> updateAstraChannel(String apiKey,
+                                             Integer id,
+                                             String channelName,
+                                             Integer channelPnr,
+                                             Integer transponderId,
+                                             Long channelIP,
+                                             Integer camId);
+
     public ArrayList<Integer> deleteAstraServer(String apiKey, Integer id);
     public ArrayList<Integer> deleteAstraAdapter(String apiKey, Integer id);
     public ArrayList<Integer> deleteAstraTransponder(String apiKey, Integer id);
     public ArrayList<Integer> deleteAstraCam(String apiKey, Integer id);
+    public ArrayList<Integer> deleteAstraChannel(String apiKey, Integer id);
 
 }

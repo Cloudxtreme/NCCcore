@@ -57,7 +57,7 @@ public class AstraManagerImpl implements AstraManagerService {
             runData.transponderType = ch.transponderType;
             runData.adapterDevice = ch.adapterDevice;
             try {
-                runData.camIP = NccUtils.long2ip(ch.camServer);
+                runData.camIP = ch.camServer;
                 runData.serverIP = NccUtils.long2ip(ch.serverIP);
                 runData.serverLocalAddress = NccUtils.long2ip(ch.serverLocalAddress);
             } catch (UnknownHostException e) {
@@ -161,6 +161,14 @@ public class AstraManagerImpl implements AstraManagerService {
         if(!new NccAPI().checkPermission(apiKey, "permGetAstraCams")) return null;
 
         return astraManager.getCams();
+    }
+
+    public ArrayList<ChannelData> getAstraChannels(String apiKey) {
+        NccAstraManager astraManager = new NccAstraManager();
+
+        if(!new NccAPI().checkPermission(apiKey, "permGetAstraChannels")) return null;
+
+        return astraManager.getChannels();
     }
 
     public ArrayList<Integer> createAstraServer(String apiKey,
@@ -307,6 +315,14 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.deleteCam(id);
     }
 
+    public ArrayList<Integer> deleteAstraChannel(String apiKey, Integer id) {
+        NccAstraManager astraManager = new NccAstraManager();
+
+        if(!new NccAPI().checkPermission(apiKey, "permDeleteAstraChannel")) return null;
+
+        return astraManager.deleteChannel(id);
+    }
+
     public ArrayList<Integer> updateAstraServer(String apiKey,
                                                 Integer id,
                                                 Long serverIP,
@@ -405,5 +421,28 @@ public class AstraManagerImpl implements AstraManagerService {
         camData.camKey = camKey;
 
         return astraManager.updateCam(camData);
+    }
+
+    public ArrayList<Integer> updateAstraChannel(String apiKey,
+                                             Integer id,
+                                                 String channelName,
+                                                 Integer channelPnr,
+                                                 Integer transponderId,
+                                                 Long channelIP,
+                                                 Integer camId) {
+
+        NccAstraManager astraManager = new NccAstraManager();
+        ChannelData channelData = new ChannelData();
+
+        if(!new NccAPI().checkPermission(apiKey, "permUpdateAstraChannel")) return null;
+
+        channelData.channelId = id;
+        channelData.channelName = channelName;
+        channelData.channelPnr = channelPnr;
+        channelData.transponderId = transponderId;
+        channelData.channelIP = channelIP;
+        channelData.camId = camId;
+
+        return astraManager.updateChannel(channelData);
     }
 }

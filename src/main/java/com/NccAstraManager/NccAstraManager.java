@@ -151,13 +151,14 @@ public class NccAstraManager {
 
         try {
             channelData.camName = rs.getString("camName");
-            channelData.camServer = rs.getLong("camServer");
+            channelData.camServer = rs.getString("camServer");
             channelData.camPort = rs.getInt("camPort");
             channelData.camUser = rs.getString("camUser");
             channelData.camPassword = rs.getString("camPassword");
             channelData.camKey = rs.getString("camKey");
 
             channelData.transponderName = rs.getString("transponderName");
+            channelData.transponderSat = rs.getString("transponderSat");
             channelData.transponderFreq = rs.getInt("transponderFreq");
             channelData.transponderPolarity = rs.getString("transponderPolarity");
             channelData.transponserFEC = rs.getString("transponderFEC");
@@ -166,9 +167,11 @@ public class NccAstraManager {
 
             channelData.adapterDevice = rs.getInt("adapterDevice");
             channelData.adapterType = rs.getString("adapterType");
+            channelData.adapterCard = rs.getString("adapterCard");
 
             channelData.serverIP = rs.getLong("serverIP");
             channelData.serverSecret = rs.getString("serverSecret");
+            channelData.serverName = rs.getString("serverName");
             channelData.serverLocalAddress = rs.getLong("serverLocalAddress");
 
             return channelData;
@@ -208,6 +211,35 @@ public class NccAstraManager {
 
         try {
             rs = query.selectQuery("SELECT * FROM nccViewAstraManagerChannel WHERE transponderId=" + id);
+
+            try {
+                while (rs.next()) {
+                    ChannelData channelData = fillChannelDataExtended(rs);
+
+                    if (channelData != null) {
+                        channels.add(channelData);
+                    }
+                }
+
+                return channels;
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+
+        } catch (NccQueryException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    public ArrayList<ChannelData> getChannels() {
+        ArrayList<ChannelData> channels = new ArrayList<>();
+
+        CachedRowSetImpl rs;
+
+        try {
+            rs = query.selectQuery("SELECT * FROM nccViewAstraManagerChannel");
 
             try {
                 while (rs.next()) {
@@ -552,6 +584,19 @@ public class NccAstraManager {
         return null;
     }
 
+    public ArrayList<Integer> deleteChannel(Integer id) {
+
+        try {
+            ArrayList<Integer> ids = query.updateQuery("DELETE FROM nccIptvChannels WHERE id=" + id);
+
+            return ids;
+        } catch (NccQueryException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
     public ArrayList<Integer> updateServer(ServerData serverData) {
 
         try {
@@ -623,6 +668,25 @@ public class NccAstraManager {
                     "camName='" + camData.camName + "', " +
                     "camKey='" + camData.camKey + "' " +
                     "WHERE id=" + camData.id);
+
+            return ids;
+        } catch (NccQueryException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    public ArrayList<Integer> updateChannel(ChannelData channelData) {
+
+        try {
+            ArrayList<Integer> ids = query.updateQuery("UPDATE nccIptvChannels SET " +
+                    "channelName='" + channelData.channelName + "', " +
+                    "channelPnr=" + channelData.channelPnr + ", " +
+                    "transponderId=" + channelData.transponderId + ", " +
+                    "channelIP=" + channelData.channelIP + ", " +
+                    "camId=" + channelData.camId + " " +
+                    "WHERE id=" + channelData.channelId);
 
             return ids;
         } catch (NccQueryException e) {

@@ -9,13 +9,14 @@ public class ChannelData {
     public Integer camId;
 
     public String camName;
-    public Long camServer;
+    public String camServer;
     public Integer camPort;
     public String camUser;
     public String camPassword;
     public String camKey;
 
     public String transponderName;
+    public String transponderSat;
     public Integer transponderFreq;
     public String transponderPolarity;
     public String transponserFEC;
@@ -24,8 +25,10 @@ public class ChannelData {
 
     public Integer adapterDevice;
     public String adapterType;
+    public String adapterCard;
 
     public Long serverIP;
     public String serverSecret;
+    public String serverName;
     public Long serverLocalAddress;
 }
