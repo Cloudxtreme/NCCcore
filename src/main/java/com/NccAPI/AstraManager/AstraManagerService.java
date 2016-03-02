@@ -6,7 +6,9 @@ import java.nio.channels.Channel;
 import java.util.ArrayList;
 
 public interface AstraManagerService {
-    public AstraManagerImpl.RunData runTransponder(String apiKey, Integer id);
+    public Integer runAstraTransponder(String apiKey, Integer id);
+    public ArrayList<Integer> stopAstraTransponder(String apiKey, Integer id);
+    public Integer getAstraTransponderStatus(String apiKey, Integer id);
 
     public ArrayList<ServerData> getAstraServers(String apiKey);
     public ArrayList<AdapterData> getAstraAdapters(String apiKey);

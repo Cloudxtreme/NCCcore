@@ -1,16 +1,30 @@
 package com.NccAstraManager;
 
+import com.NccAPI.NccAPI;
+import com.NccSystem.NccUtils;
 import com.NccSystem.SQL.NccQuery;
 import com.NccSystem.SQL.NccQueryException;
+import com.sun.corba.se.impl.encoding.OSFCodeSetRegistry;
 import com.sun.rowset.CachedRowSetImpl;
 import org.apache.log4j.Logger;
 
+import java.io.*;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Map;
 
 public class NccAstraManager {
     private static Logger logger = Logger.getLogger(NccAstraManager.class);
     private NccQuery query;
+
+    public class ActiveTransponder {
+        public Integer id;
+        public Process process;
+        public BufferedReader reader;
+    }
+
+    public static ArrayList<ActiveTransponder> Transponders = new ArrayList<>();
 
     public NccAstraManager() {
         try {
@@ -378,6 +392,26 @@ public class NccAstraManager {
         return null;
     }
 
+    public TransponderData getTransponderById(Integer id) {
+        CachedRowSetImpl rs;
+
+        try {
+            rs = query.selectQuery("SELECT * FROM nccViewAstraTransponders WHERE id=" + id);
+
+            try {
+                if (rs.next()) {
+                    return fillTransponderData(rs);
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        } catch (NccQueryException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
     public ArrayList<CamData> getCams() {
         ArrayList<CamData> cams = new ArrayList<>();
         CachedRowSetImpl rs;
@@ -694,5 +728,107 @@ public class NccAstraManager {
         }
 
         return null;
+    }
+
+    public Process runTransponder(Integer id) {
+        ArrayList<ChannelData> channelData = this.getChannelsByTransponder(id);
+        TransponderData transponderData = this.getTransponderById(id);
+
+        File tmpFile = null;
+        try {
+            tmpFile = File.createTempFile("tmp", ".lua", new File("/tmp"));
+            FileOutputStream fileOutputStream = new FileOutputStream(tmpFile);
+            OutputStreamWriter outputStreamWriter = new OutputStreamWriter(fileOutputStream);
+            Writer writer = new BufferedWriter(outputStreamWriter);
+
+            writer.write("log.set({ debug = false, stdout = true, filename = \"/var/log/astra/" + transponderData.transponderFreq + transponderData.transponderPolarity + ".log\" })\n");
+            writer.write("pidfile(\"/etc/astra/run/" + transponderData.transponderFreq + transponderData.transponderPolarity + ".pid\")\n\n");
+            writer.write("dvb1 = dvb_tune({ adapter = " + transponderData.adapterDevice + ", " +
+                    "type =\"" + transponderData.transponderType + "\", " +
+                    "lnb = \"" + transponderData.transponderLNB + "\", " +
+                    "tp = \"" + transponderData.transponderFreq + ":" + transponderData.transponderPolarity + ":" + transponderData.transponderSymbolrate + "\" })\n\n");
+
+            for (ChannelData ch : channelData) {
+
+                writer.write("make_channel({ name = \"" + ch.channelName + "\", input = { \"dvb://dvb1#pnr=" + ch.channelPnr + "\" }, output = { \"udp://" + NccUtils.long2ip(ch.channelIP) + ":1234#localaddr=" + transponderData.serverLocalAddress + "&ttl=7\" } })\n\n");
+            }
+
+            writer.close();
+
+//            System.out.println(tmpFile.getAbsoluteFile());
+
+            Process p;
+            p = Runtime.getRuntime().exec("/usr/bin/astra " + tmpFile.getAbsoluteFile());
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+/*
+            String line = "";
+            while ((line = reader.readLine()) != null) {
+                System.out.println(line);
+            }
+*/
+
+            ActiveTransponder activeTransponder = new ActiveTransponder();
+            activeTransponder.id = id;
+            activeTransponder.process = p;
+            activeTransponder.reader = reader;
+            Transponders.add(activeTransponder);
+
+            System.out.println("Transponder started. Active transponders: " + Transponders.size());
+
+            tmpFile.deleteOnExit();
+        } catch (Exception e) {
+
+        }
+        return null;
+    }
+
+    public ActiveTransponder getActiveTransponderById(Integer id){
+        Iterator<ActiveTransponder> it = Transponders.iterator();
+
+        while (it.hasNext()){
+            ActiveTransponder item = it.next();
+
+            if (item.id == id) {
+                return item;
+            }
+        }
+
+        return null;
+    }
+
+    public ArrayList<Integer> stopTransponder(Integer id) {
+
+        ArrayList<Integer> stoppedTransponders = new ArrayList<>();
+
+        Iterator<ActiveTransponder> it = Transponders.iterator();
+
+        while (it.hasNext()){
+            ActiveTransponder item = it.next();
+
+            if (item.id == id) {
+                item.process.destroy();
+                try {
+                    item.process.waitFor();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                stoppedTransponders.add(item.id);
+                it.remove();
+                System.out.println("Stopped transponder: " + id + " Active transponders: " + Transponders.size());
+            }
+        }
+
+        return stoppedTransponders;
+    }
+
+    public Integer getTransponderStatus(Integer id){
+
+        ActiveTransponder activeTransponder = getActiveTransponderById(id);
+
+        if(activeTransponder != null) return 1;
+
+        return 0;
     }
 }
