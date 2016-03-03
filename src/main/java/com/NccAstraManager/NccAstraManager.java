@@ -109,7 +109,7 @@ public class NccAstraManager {
             transponderData.serverName = rs.getString("serverName");
             transponderData.transponderLNB = rs.getString("transponderLNB");
             transponderData.transponderSat = rs.getString("transponderSat");
-            transponderData.transponderStatus = rs.getInt("transponderStatus");
+            transponderData.transponderStatus = getTransponderStatus(transponderData.id);
 
             return transponderData;
         } catch (SQLException e) {
@@ -784,10 +784,10 @@ public class NccAstraManager {
         return null;
     }
 
-    public ActiveTransponder getActiveTransponderById(Integer id){
+    public ActiveTransponder getActiveTransponderById(Integer id) {
         Iterator<ActiveTransponder> it = Transponders.iterator();
 
-        while (it.hasNext()){
+        while (it.hasNext()) {
             ActiveTransponder item = it.next();
 
             if (item.id == id) {
@@ -804,7 +804,7 @@ public class NccAstraManager {
 
         Iterator<ActiveTransponder> it = Transponders.iterator();
 
-        while (it.hasNext()){
+        while (it.hasNext()) {
             ActiveTransponder item = it.next();
 
             if (item.id == id) {
@@ -823,11 +823,11 @@ public class NccAstraManager {
         return stoppedTransponders;
     }
 
-    public Integer getTransponderStatus(Integer id){
+    public Integer getTransponderStatus(Integer id) {
 
         ActiveTransponder activeTransponder = getActiveTransponderById(id);
 
-        if(activeTransponder != null) return 1;
+        if (activeTransponder != null) return id;
 
         return 0;
     }
