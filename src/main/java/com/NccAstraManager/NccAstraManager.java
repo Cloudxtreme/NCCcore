@@ -746,11 +746,14 @@ public class NccAstraManager {
             writer.write("dvb1 = dvb_tune({ adapter = " + transponderData.adapterDevice + ", " +
                     "type =\"" + transponderData.transponderType + "\", " +
                     "lnb = \"" + transponderData.transponderLNB + "\", " +
-                    "tp = \"" + transponderData.transponderFreq + ":" + transponderData.transponderPolarity + ":" + transponderData.transponderSymbolrate + "\" })\n\n");
+                    "tp = \"" + transponderData.transponderFreq + ":" + transponderData.transponderPolarity + ":" + transponderData.transponderSymbolrate + "\"," +
+                    "fec = \"" + transponderData.transponderFEC + "\" })\n\n");
+
 
             for (ChannelData ch : channelData) {
 
-                writer.write("make_channel({ name = \"" + ch.channelName + "\", input = { \"dvb://dvb1#pnr=" + ch.channelPnr + "\" }, output = { \"udp://" + NccUtils.long2ip(ch.channelIP) + ":1234#localaddr=" + transponderData.serverLocalAddress + "&ttl=7\" } })\n\n");
+                writer.write("cam_" + ch.channelPnr + " = newcamd({ name = \"cam_" + ch.channelPnr + "\", host = \"" + ch.camServer + "\", port = \"" + ch.camPort + "\", user = \"" + ch.camUser + "\", pass = \"" + ch.camPassword + "\", key = \"" + ch.camKey + "\", })");
+                writer.write("make_channel({ name = \"" + ch.channelName + "\", input = { \"dvb://dvb1#pnr=" + ch.channelPnr + "&cam=cam_" + ch.channelPnr + "\" }, output = { \"udp://" + NccUtils.long2ip(ch.channelIP) + ":1234#localaddr=" + transponderData.serverLocalAddress + "&ttl=7\" } })\n\n");
             }
 
             writer.close();
