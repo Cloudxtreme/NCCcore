@@ -752,8 +752,12 @@ public class NccAstraManager {
 
             for (ChannelData ch : channelData) {
 
-                writer.write("cam_" + ch.channelPnr + " = newcamd({ name = \"cam_" + ch.channelPnr + "\", host = \"" + ch.camServer + "\", port = \"" + ch.camPort + "\", user = \"" + ch.camUser + "\", pass = \"" + ch.camPassword + "\", key = \"" + ch.camKey + "\", })");
-                writer.write("make_channel({ name = \"" + ch.channelName + "\", input = { \"dvb://dvb1#pnr=" + ch.channelPnr + "&cam=cam_" + ch.channelPnr + "\" }, output = { \"udp://" + NccUtils.long2ip(ch.channelIP) + ":1234#localaddr=" + transponderData.serverLocalAddress + "&ttl=7\" } })\n\n");
+                if(ch.camId>0) {
+                    writer.write("cam_" + ch.channelPnr + " = newcamd({ name = \"cam_" + ch.channelPnr + "\", host = \"" + ch.camServer + "\", port = \"" + ch.camPort + "\", user = \"" + ch.camUser + "\", pass = \"" + ch.camPassword + "\", key = \"" + ch.camKey + "\", })");
+                    writer.write("make_channel({ name = \"" + ch.channelName + "\", input = { \"dvb://dvb1#pnr=" + ch.channelPnr + "&cam=cam_" + ch.channelPnr + "\" }, output = { \"udp://" + NccUtils.long2ip(ch.channelIP) + ":1234#localaddr=" + transponderData.serverLocalAddress + "&ttl=7\" } })\n\n");
+                } else {
+                    writer.write("make_channel({ name = \"" + ch.channelName + "\", input = { \"dvb://dvb1#pnr=" + ch.channelPnr + "\" }, output = { \"udp://" + NccUtils.long2ip(ch.channelIP) + ":1234#localaddr=" + transponderData.serverLocalAddress + "&ttl=7\" } })\n\n");
+                }
             }
 
             writer.close();
@@ -781,6 +785,11 @@ public class NccAstraManager {
             System.out.println("Transponder started. Active transponders: " + Transponders.size());
 
             tmpFile.deleteOnExit();
+
+            p.waitFor();
+
+            System.out.println("Astra process terminated");
+            removeActiveTransponder(id);
         } catch (Exception e) {
 
         }
@@ -799,6 +808,20 @@ public class NccAstraManager {
         }
 
         return null;
+    }
+
+    public void removeActiveTransponder(Integer id){
+        ArrayList<Integer> stoppedTransponders = new ArrayList<>();
+
+        Iterator<ActiveTransponder> it = Transponders.iterator();
+
+        while (it.hasNext()) {
+            ActiveTransponder item = it.next();
+
+            if (item.id == id) {
+                it.remove();
+            }
+        }
     }
 
     public ArrayList<Integer> stopTransponder(Integer id) {
