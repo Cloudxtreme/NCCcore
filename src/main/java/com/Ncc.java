@@ -23,10 +23,11 @@ public class Ncc {
     private static Logger logger = Logger.getRootLogger();
     private static String logLevel = "DEBUG";
     private static String logFile = "NCC.log";
+    private static boolean moduleRadius = true;
+    private static boolean moduleDHCP = true;
 
     public static void main(String[] args) throws InterruptedException, SQLException, IOException {
 
-        boolean moduleRadius = true, moduleDHCP = true;
 
         logger.setLevel(Level.toLevel(logLevel));
 
@@ -99,7 +100,7 @@ public class Ncc {
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
                 logger.info("Stopping NCC server...");
-                nccRadius.stop();
+                if(moduleRadius) nccRadius.stop();
                 nccAPI.stop();
                 sqlPool.close();
             }

@@ -4,6 +4,7 @@ import com.NccAPI.NccAPI;
 import com.NccSystem.NccUtils;
 import com.NccSystem.SQL.NccQuery;
 import com.NccSystem.SQL.NccQueryException;
+import com.mysql.management.util.Str;
 import com.sun.corba.se.impl.encoding.OSFCodeSetRegistry;
 import com.sun.rowset.CachedRowSetImpl;
 import org.apache.log4j.Logger;
@@ -22,6 +23,12 @@ public class NccAstraManager {
         public File tmpFile;
         public BufferedReader reader;
         public ArrayList<ActiveChannel> channels;
+        public Timer timer;
+        public TimerTask timerTask;
+        public Integer signal;
+        public Integer snr;
+        public Integer ber;
+        public Integer unc;
     }
 
     public class ActiveChannel {
@@ -33,6 +40,8 @@ public class NccAstraManager {
         public Integer bitrate;
         public Timer timer;
         public TimerTask timerTask;
+        public Integer scrambledCount;
+        public Integer ccCount;
     }
 
     public static ArrayList<ActiveTransponder> Transponders = new ArrayList<>();
@@ -782,6 +791,8 @@ public class NccAstraManager {
             activeChannel.reader = reader;
             activeChannel.channelData = channelData;
             activeChannel.bitrate = 0;
+            activeChannel.scrambledCount = 0;
+            activeChannel.ccCount = 0;
             Channels.add(activeChannel);
 
             Timer timer = new Timer();
@@ -792,17 +803,30 @@ public class NccAstraManager {
                         String line = "";
 
                         while ((line = reader.readLine()) != null) {
-                            if (line.matches("(.*)Bitrate(.*)")) break;
+                            if (line.matches("(.*)Bitrate(.*)") || line.matches("(.*)ERROR(.*)")) break;
                         }
 
                         //System.out.println("id=" + channelId + " Analyzer: " + line);
+                        ActiveChannel channel = getActiveChannelById(channelId);
+                        String[] parts = line.split("\\s");
 
-                        if (line.matches("(.*)Bitrate(.*)")) {
-                            ActiveChannel channel = getActiveChannelById(channelId);
-                            String[] parts = line.split("\\s");
-                            channel.bitrate = Integer.parseInt(parts[5]);
+                        if (parts[3].matches("(.*)INFO(.*)")) {
+                            if (parts[4].matches("(.*)Bitrate(.*)")) {
+                                channel.bitrate = Integer.parseInt(parts[5]);
 
-                            System.out.println("id=" + channel.id + " pid=" + channel.channelData.channelPnr + " bitrate=" + channel.bitrate);
+//                            System.out.println("id=" + channel.id + " pid=" + channel.channelData.channelPnr + " bitrate=" + channel.bitrate);
+                            }
+                        }
+
+                        if (parts[3].matches("(.*)ERROR(.*)")) {
+                            if (parts[4].matches("(.*)Scrambled(.*)")) {
+                                channel.scrambledCount++;
+                                System.out.println("Channel [" + channel.channelData.channelName + "] scrambled, count=" + channel.scrambledCount + " bitrate=" + channel.bitrate);
+                            }
+                            if (parts[4].matches("(.*)CC(.*)")) {
+                                channel.ccCount++;
+                                System.out.println("Channel [" + channel.channelData.channelName + "] CC ERROR, count=" + channel.ccCount + " bitrate=" + channel.bitrate);
+                            }
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -863,21 +887,55 @@ public class NccAstraManager {
             Process p;
             p = Runtime.getRuntime().exec("/usr/bin/astra " + tmpFile.getAbsoluteFile());
 
-            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            final BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
 
-/*
-            String line = "";
-            while ((line = reader.readLine()) != null) {
-                System.out.println(line);
-            }
-*/
-
-            ActiveTransponder activeTransponder = new ActiveTransponder();
+            final ActiveTransponder activeTransponder = new ActiveTransponder();
             activeTransponder.id = id;
             activeTransponder.process = p;
             activeTransponder.tmpFile = tmpFile;
             activeTransponder.reader = reader;
             Transponders.add(activeTransponder);
+
+            Timer timer = new Timer();
+            TimerTask timerTask = new TimerTask() {
+                @Override
+                public void run() {
+                    try {
+                        String line = "";
+
+                        while ((line = activeTransponder.reader.readLine()) != null) {
+                            if (line.matches("(.*)SCVYL(.*)")) {
+                                break;
+                            }
+                        }
+
+                        if (line.matches("(.*)SCVYL(.*)")) {
+                            line = line.replaceAll("signal:", "");
+                            line = line.replaceAll("snr:", "");
+                            line = line.replaceAll("ber:", "");
+                            line = line.replaceAll("unc:", "");
+                            line = line.replaceAll("%", "");
+                            String[] parts = line.split("\\s");
+
+                            ActiveTransponder transponder = getActiveTransponderById(activeTransponder.id);
+
+                            transponder.signal = Integer.parseInt(parts[10]);
+                            transponder.snr = Integer.parseInt(parts[11]);
+                            transponder.ber = Integer.parseInt(parts[12]);
+                            transponder.unc = Integer.parseInt(parts[13]);
+
+                            System.out.println("Transponder lock: signal=" + transponder.signal + " snr=" + transponder.snr + " ber=" + transponder.ber + " unc=" + transponder.unc);
+                        }
+                    } catch (IOException e) {
+//                        e.printStackTrace();
+                    }
+                }
+            };
+
+            timer.schedule(timerTask, 1000, 1000);
+
+            activeTransponder.timer = timer;
+            activeTransponder.timerTask = timerTask;
 
             System.out.println("Transponder started. Active transponders: " + Transponders.size());
 
@@ -982,25 +1040,24 @@ public class NccAstraManager {
 
         ArrayList<Integer> stoppedTransponders = new ArrayList<>();
 
-        ArrayList<ActiveChannel> activeChannels = getActiveChannelsByTransponderId(id);
-        Iterator<ActiveChannel> ait = activeChannels.iterator();
-
-        System.out.println("Stopping transponder with " + activeChannels.size() + " active channels");
+        Iterator<ActiveChannel> ait = Channels.iterator();
 
         while (ait.hasNext()) {
             ActiveChannel item = ait.next();
 
-            item.timerTask.cancel();
-            item.timer.cancel();
+            if (item.transponderId == id) {
+                item.timerTask.cancel();
+                item.timer.cancel();
 
-            item.process.destroy();
-            try {
-                item.process.waitFor();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+                item.process.destroy();
+                try {
+                    item.process.waitFor();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                ait.remove();
+                System.out.println("Stopped analyzer for channel: " + item.id);
             }
-            ait.remove();
-            System.out.println("Stopped analyzer for channel: " + item.id);
         }
 
         Iterator<ActiveTransponder> it = Transponders.iterator();
@@ -1009,6 +1066,10 @@ public class NccAstraManager {
             ActiveTransponder item = it.next();
 
             if (item.id == id) {
+
+                item.timerTask.cancel();
+                item.timer.cancel();
+
                 item.process.destroy();
                 try {
                     item.process.waitFor();
