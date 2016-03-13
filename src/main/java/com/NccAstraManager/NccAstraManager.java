@@ -10,9 +10,7 @@ import org.apache.log4j.Logger;
 
 import java.io.*;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 
 public class NccAstraManager {
     private static Logger logger = Logger.getLogger(NccAstraManager.class);
@@ -21,10 +19,24 @@ public class NccAstraManager {
     public class ActiveTransponder {
         public Integer id;
         public Process process;
+        public File tmpFile;
         public BufferedReader reader;
+        public ArrayList<ActiveChannel> channels;
+    }
+
+    public class ActiveChannel {
+        public Integer id;
+        public Integer transponderId;
+        public ChannelData channelData;
+        public Process process;
+        public BufferedReader reader;
+        public Integer bitrate;
+        public Timer timer;
+        public TimerTask timerTask;
     }
 
     public static ArrayList<ActiveTransponder> Transponders = new ArrayList<>();
+    public static ArrayList<ActiveChannel> Channels = new ArrayList<>();
 
     public NccAstraManager() {
         try {
@@ -236,6 +248,29 @@ public class NccAstraManager {
                 }
 
                 return channels;
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+
+        } catch (NccQueryException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    public ChannelData getChannelById(Integer id) {
+
+        CachedRowSetImpl rs;
+
+        try {
+            rs = query.selectQuery("SELECT * FROM nccViewAstraManagerChannel WHERE channelId=" + id);
+
+            try {
+                if (rs.next()) {
+                    ChannelData channelData = fillChannelDataExtended(rs);
+                    return channelData;
+                }
             } catch (SQLException e) {
                 e.printStackTrace();
             }
@@ -730,6 +765,64 @@ public class NccAstraManager {
         return null;
     }
 
+    public void runAnalyzer(final Integer channelId, Integer transponderId) {
+
+        ChannelData channelData = getChannelById(channelId);
+
+        Process p;
+        try {
+            System.out.println("Starting Analyzer: udp://" + NccUtils.long2ip(channelData.serverLocalAddress) + "@" + NccUtils.long2ip(channelData.channelIP) + ":1234");
+            p = Runtime.getRuntime().exec("/usr/bin/astra --analyze udp://" + NccUtils.long2ip(channelData.serverLocalAddress) + "@" + NccUtils.long2ip(channelData.channelIP) + ":1234");
+            final BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+            final ActiveChannel activeChannel = new ActiveChannel();
+            activeChannel.id = channelId;
+            activeChannel.transponderId = transponderId;
+            activeChannel.process = p;
+            activeChannel.reader = reader;
+            activeChannel.channelData = channelData;
+            activeChannel.bitrate = 0;
+            Channels.add(activeChannel);
+
+            Timer timer = new Timer();
+            TimerTask timerTask = new TimerTask() {
+                @Override
+                public void run() {
+                    try {
+                        String line = "";
+
+                        while ((line = reader.readLine()) != null) {
+                            if (line.matches("(.*)Bitrate(.*)")) break;
+                        }
+
+                        //System.out.println("id=" + channelId + " Analyzer: " + line);
+
+                        if (line.matches("(.*)Bitrate(.*)")) {
+                            ActiveChannel channel = getActiveChannelById(channelId);
+                            String[] parts = line.split("\\s");
+                            channel.bitrate = Integer.parseInt(parts[5]);
+
+                            System.out.println("id=" + channel.id + " pid=" + channel.channelData.channelPnr + " bitrate=" + channel.bitrate);
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            };
+
+            timer.schedule(timerTask, 1000, 1000);
+
+            activeChannel.timer = timer;
+            activeChannel.timerTask = timerTask;
+
+            System.out.println("Channel analyzer started id=" + channelId);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
     public Process runTransponder(Integer id) {
         ArrayList<ChannelData> channelData = this.getChannelsByTransponder(id);
         TransponderData transponderData = this.getTransponderById(id);
@@ -752,15 +845,18 @@ public class NccAstraManager {
 
             for (ChannelData ch : channelData) {
 
-                if(ch.camId>0) {
+                if (ch.camId > 0) {
                     writer.write("cam_" + ch.channelPnr + " = newcamd({ name = \"cam_" + ch.channelPnr + "\", host = \"" + ch.camServer + "\", port = \"" + ch.camPort + "\", user = \"" + ch.camUser + "\", pass = \"" + ch.camPassword + "\", key = \"" + ch.camKey + "\", })");
-                    writer.write("make_channel({ name = \"" + ch.channelName + "\", input = { \"dvb://dvb1#pnr=" + ch.channelPnr + "&cam=cam_" + ch.channelPnr + "\" }, output = { \"udp://" + NccUtils.long2ip(ch.channelIP) + ":1234#localaddr=" + transponderData.serverLocalAddress + "&ttl=7\" } })\n\n");
+                    writer.write("make_channel({ name = \"" + ch.channelName + "\", input = { \"dvb://dvb1#pnr=" + ch.channelPnr + "&cam=cam_" + ch.channelPnr + "\" }, output = { \"udp://" + NccUtils.long2ip(ch.channelIP) + ":1234#localaddr=" + NccUtils.long2ip(transponderData.serverLocalAddress) + "&ttl=7\" } })\n\n");
                 } else {
-                    writer.write("make_channel({ name = \"" + ch.channelName + "\", input = { \"dvb://dvb1#pnr=" + ch.channelPnr + "\" }, output = { \"udp://" + NccUtils.long2ip(ch.channelIP) + ":1234#localaddr=" + transponderData.serverLocalAddress + "&ttl=7\" } })\n\n");
+                    writer.write("make_channel({ name = \"" + ch.channelName + "\", input = { \"dvb://dvb1#pnr=" + ch.channelPnr + "\" }, output = { \"udp://" + NccUtils.long2ip(ch.channelIP) + ":1234#localaddr=" + NccUtils.long2ip(transponderData.serverLocalAddress) + "&ttl=7\" } })\n\n");
                 }
+
+                runAnalyzer(ch.channelId, id);
             }
 
             writer.close();
+
 
 //            System.out.println(tmpFile.getAbsoluteFile());
 
@@ -779,6 +875,7 @@ public class NccAstraManager {
             ActiveTransponder activeTransponder = new ActiveTransponder();
             activeTransponder.id = id;
             activeTransponder.process = p;
+            activeTransponder.tmpFile = tmpFile;
             activeTransponder.reader = reader;
             Transponders.add(activeTransponder);
 
@@ -810,7 +907,51 @@ public class NccAstraManager {
         return null;
     }
 
-    public void removeActiveTransponder(Integer id){
+    public ActiveChannel getActiveChannelById(Integer id) {
+        Iterator<ActiveChannel> it = Channels.iterator();
+
+        while (it.hasNext()) {
+            ActiveChannel item = it.next();
+
+            if (item.id == id) {
+                return item;
+            }
+        }
+
+        return null;
+    }
+
+    public ArrayList<ActiveChannel> getActiveChannelsByTransponderId(Integer id) {
+        Iterator<ActiveChannel> it = Channels.iterator();
+        ArrayList<ActiveChannel> activeChannels = new ArrayList<>();
+
+        while (it.hasNext()) {
+            ActiveChannel item = it.next();
+
+            if (item.transponderId == id) {
+                activeChannels.add(item);
+            }
+        }
+
+        return activeChannels;
+    }
+
+    public ActiveTransponder getActiveTransponderByChannelId(Integer id) {
+        Iterator<ActiveChannel> it = Channels.iterator();
+
+        while (it.hasNext()) {
+            ActiveChannel item = it.next();
+
+            if (item.transponderId == id) {
+                ActiveTransponder activeTransponder = getActiveTransponderById(id);
+                return activeTransponder;
+            }
+        }
+
+        return null;
+    }
+
+    public void removeActiveTransponder(Integer id) {
         ArrayList<Integer> stoppedTransponders = new ArrayList<>();
 
         Iterator<ActiveTransponder> it = Transponders.iterator();
@@ -824,9 +965,43 @@ public class NccAstraManager {
         }
     }
 
+    public void removeActiveChannel(Integer id) {
+
+        Iterator<ActiveChannel> it = Channels.iterator();
+
+        while (it.hasNext()) {
+            ActiveChannel item = it.next();
+
+            if (item.id == id) {
+                it.remove();
+            }
+        }
+    }
+
     public ArrayList<Integer> stopTransponder(Integer id) {
 
         ArrayList<Integer> stoppedTransponders = new ArrayList<>();
+
+        ArrayList<ActiveChannel> activeChannels = getActiveChannelsByTransponderId(id);
+        Iterator<ActiveChannel> ait = activeChannels.iterator();
+
+        System.out.println("Stopping transponder with " + activeChannels.size() + " active channels");
+
+        while (ait.hasNext()) {
+            ActiveChannel item = ait.next();
+
+            item.timerTask.cancel();
+            item.timer.cancel();
+
+            item.process.destroy();
+            try {
+                item.process.waitFor();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            ait.remove();
+            System.out.println("Stopped analyzer for channel: " + item.id);
+        }
 
         Iterator<ActiveTransponder> it = Transponders.iterator();
 
@@ -842,6 +1017,7 @@ public class NccAstraManager {
                 }
                 stoppedTransponders.add(item.id);
                 it.remove();
+                item.tmpFile.delete();
                 System.out.println("Stopped transponder: " + id + " Active transponders: " + Transponders.size());
             }
         }
