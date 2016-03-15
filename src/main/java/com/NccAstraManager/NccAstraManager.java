@@ -17,6 +17,15 @@ public class NccAstraManager {
     private static Logger logger = Logger.getLogger(NccAstraManager.class);
     private NccQuery query;
 
+    public class TransponderStatus {
+        public Integer id;
+        public Integer status;
+        public Integer signal;
+        public Integer snr;
+        public Integer ber;
+        public Integer unc;
+    }
+
     public class ActiveTransponder {
         public Integer id;
         public Process process;
@@ -821,7 +830,7 @@ public class NccAstraManager {
                         if (parts[3].matches("(.*)ERROR(.*)")) {
                             if (parts[4].matches("(.*)Scrambled(.*)")) {
                                 channel.scrambledCount++;
-                                System.out.println("Channel [" + channel.channelData.channelName + "] scrambled, count=" + channel.scrambledCount + " bitrate=" + channel.bitrate);
+//                                System.out.println("Channel [" + channel.channelData.channelName + "] scrambled, count=" + channel.scrambledCount + " bitrate=" + channel.bitrate);
                             }
                             if (parts[4].matches("(.*)CC(.*)")) {
                                 channel.ccCount++;
@@ -1086,12 +1095,23 @@ public class NccAstraManager {
         return stoppedTransponders;
     }
 
-    public Integer getTransponderStatus(Integer id) {
+    public TransponderStatus getTransponderStatus(Integer id) {
 
+        TransponderStatus transponderStatus = new TransponderStatus();
         ActiveTransponder activeTransponder = getActiveTransponderById(id);
 
-        if (activeTransponder != null) return id;
+        transponderStatus.id = id;
+        transponderStatus.status = 0;
 
-        return 0;
+        if (activeTransponder != null) {
+            transponderStatus.status = 1;
+            transponderStatus.signal = activeTransponder.signal;
+            transponderStatus.snr = activeTransponder.snr;
+            transponderStatus.ber = activeTransponder.ber;
+            transponderStatus.unc = activeTransponder.unc;
+            return transponderStatus;
+        }
+
+        return transponderStatus;
     }
 }

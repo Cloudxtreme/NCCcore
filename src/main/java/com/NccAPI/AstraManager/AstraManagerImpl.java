@@ -15,17 +15,25 @@ import java.util.ArrayList;
 public class AstraManagerImpl implements AstraManagerService {
 
     public Integer runAstraTransponder(String apiKey, Integer id) {
-        NccAstraManager astraManager = new NccAstraManager();
+        final NccAstraManager astraManager = new NccAstraManager();
+        final Integer transponderId = id;
 
         if (!new NccAPI().checkPermission(apiKey, "permRunAstraTransponder")) return null;
 
         astraManager.stopTransponder(id);
-        astraManager.runTransponder(id);
+
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                astraManager.runTransponder(transponderId);
+            }
+        });
+        t.start();
 
         return 0;
     }
 
-    public ArrayList<Integer> stopAstraTransponder(String apiKey, Integer id){
+    public ArrayList<Integer> stopAstraTransponder(String apiKey, Integer id) {
         NccAstraManager astraManager = new NccAstraManager();
 
         if (!new NccAPI().checkPermission(apiKey, "permStopAstraTransponder")) return null;
@@ -33,7 +41,7 @@ public class AstraManagerImpl implements AstraManagerService {
         return astraManager.stopTransponder(id);
     }
 
-    public Integer getAstraTransponderStatus(String apiKey, Integer id) {
+    public NccAstraManager.TransponderStatus getAstraTransponderStatus(String apiKey, Integer id) {
         NccAstraManager astraManager = new NccAstraManager();
 
         if (!new NccAPI().checkPermission(apiKey, "permAstraGetTransponderStatus")) return null;
