@@ -1,9 +1,14 @@
 package com.NccDhcp;
 
+import org.apache.log4j.Logger;
+
+import javax.xml.bind.DatatypeConverter;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 
 public class NccDhcpPacket {
+    private static Logger logger = Logger.getLogger(NccDhcpPacket.class);
+
     public byte[] dhcpMsgType;
     public byte[] dhcpHwType;
     public byte[] dhcpHwAddrLen;
@@ -17,6 +22,7 @@ public class NccDhcpPacket {
     public byte[] dhcpRelayAgentIP;
     public byte[] dhcpClientMACAddress;
     public byte[] dhcpMagicCookie;
+    public byte[] dhcpClientID;
 
     public byte[] dhcpOpt82CircuitID;
     public byte[] dhcpOpt82RemoteID;
@@ -71,10 +77,11 @@ public class NccDhcpPacket {
     private static int DHCP_RELAY_AGENT_REMOTE_ID = 2;
     private static int DHCP_RELAY_AGENT_VENDOR = 9;
 
-    public NccDhcpPacket(byte[] data, int dataLen) {
+    public NccDhcpPacket(byte[] data, int dataLen) throws NccDhcpException {
 
-        if (dataLen < DHCP_OPTIONS_OFFSET) return;
-        if (!baCompare(data, DHCP_MAGIC_COOKIE_OFFSET, DHCP_MAGIC_COOKIE)) return;
+        if (dataLen < DHCP_OPTIONS_OFFSET) throw new NccDhcpException("Wrong DHCP packet len: " + dataLen);
+        if (!baCompare(data, DHCP_MAGIC_COOKIE_OFFSET, DHCP_MAGIC_COOKIE))
+            throw new NccDhcpException("Incorrect packet format, DHCP_MAGIC_COOKIE not found");
 
         this.dhcpMsgType = baSubstr(data, DHCP_MSG_TYPE_OFFSET, 1);
         this.dhcpHwType = baSubstr(data, DHCP_HW_TYPE_OFFSET, 1);
@@ -97,7 +104,8 @@ public class NccDhcpPacket {
                 if (len < 1) break;
                 i++;
                 this.dhcpMsgType = baSubstr(data, i, 1);
-                i += len;
+                i += len - 1;
+                continue;
             }
 
             if (data[i] == DHCP_OPTION_61_CLIENT_ID) {
@@ -105,7 +113,9 @@ public class NccDhcpPacket {
                 Integer len = ba2int(baSubstr(data, i, 1));
                 if (len < 1) break;
                 i++;
-                i += len;
+                this.dhcpClientID = baSubstr(data, i, len);
+                i += len - 1;
+                continue;
             }
 
             if (data[i] == DHCP_OPTION_12_HOSTNAME) {
@@ -113,7 +123,8 @@ public class NccDhcpPacket {
                 Integer len = ba2int(baSubstr(data, i, 1));
                 if (len < 1) break;
                 i++;
-                i += len;
+                i += len - 1;
+                continue;
             }
 
             if (data[i] == DHCP_OPTION_60_CLASS_ID) {
@@ -121,7 +132,8 @@ public class NccDhcpPacket {
                 Integer len = ba2int(baSubstr(data, i, 1));
                 if (len < 1) break;
                 i++;
-                i += len;
+                i += len - 1;
+                continue;
             }
 
             if (data[i] == DHCP_OPTION_55_PARAM_LIST) {
@@ -129,7 +141,8 @@ public class NccDhcpPacket {
                 Integer len = ba2int(baSubstr(data, i, 1));
                 if (len < 1) break;
                 i++;
-                i += len;
+                i += len - 1;
+                continue;
             }
 
             if (data[i] == DHCP_OPTION_50_ADDRESS_REQ) {
@@ -137,7 +150,8 @@ public class NccDhcpPacket {
                 Integer len = ba2int(baSubstr(data, i, 1));
                 if (len < 1) break;
                 i++;
-                i += len;
+                i += len - 1;
+                continue;
             }
 
             if (data[i] == DHCP_OPTION_82_RELAY_AGENT) {
@@ -152,7 +166,8 @@ public class NccDhcpPacket {
                         if (slen < 1) break;
                         j++;
                         this.dhcpOpt82CircuitID = baSubstr(data, j, slen);
-                        j += slen;
+                        j += slen - 1;
+                        continue;
                     }
 
                     if (data[j] == DHCP_RELAY_AGENT_REMOTE_ID) {
@@ -161,7 +176,8 @@ public class NccDhcpPacket {
                         if (slen < 1) break;
                         j++;
                         this.dhcpOpt82RemoteID = baSubstr(data, j, slen);
-                        j += slen;
+                        j += slen - 1;
+                        continue;
                     }
 
                     if (data[j] == DHCP_RELAY_AGENT_VENDOR) {
@@ -170,10 +186,12 @@ public class NccDhcpPacket {
                         if (slen < 1) break;
                         j++;
                         this.dhcpOpt82VendorID = baSubstr(data, j, slen);
-                        j += slen;
+                        j += slen - 1;
+                        continue;
                     }
                 }
-                i += len;
+                i += len - 1;
+                continue;
             }
 
         }
@@ -224,10 +242,25 @@ public class NccDhcpPacket {
         return 0;
     }
 
-    int getType(){
+    int getType() {
         int type = ba2int(this.dhcpMsgType);
 
         return type;
+    }
+
+    String getOpt82RemoteID() {
+
+        if (this.dhcpOpt82RemoteID != null) {
+            StringBuilder sb = new StringBuilder();
+
+            for (int i = 0; i < this.dhcpOpt82RemoteID.length; i++) {
+                sb.append(String.format("%02X%s", this.dhcpOpt82RemoteID[i], (i < this.dhcpOpt82RemoteID.length - 1) ? ":" : ""));
+            }
+
+            return sb.toString();
+        }
+
+        return "";
     }
 
     byte[] buildReply(byte type, InetAddress clientIP, InetAddress netmask, InetAddress gateway, InetAddress dns, int leaseTime) {

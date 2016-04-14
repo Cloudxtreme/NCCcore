@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.net.*;
 
 public class NccDhcpServer {
-    private static Logger logger = Logger.getLogger(NccDhcp.class);
+    private static Logger logger = Logger.getLogger(NccDhcpServer.class);
 
     private static DatagramSocket dhcpSocket;
 
@@ -35,14 +35,12 @@ public class NccDhcpServer {
                             @Override
                             public void run() {
 
-                                NccDhcpPacket pkt = new NccDhcpPacket(recv, inPkt.getLength());
+                                try {
+                                    NccDhcpPacket pkt = new NccDhcpPacket(recv, inPkt.getLength());
 
-                                if (pkt == null) {
-                                    System.out.println("Wrong packet received");
-                                } else {
                                     if (pkt.getType() == NccDhcpPacket.DHCP_MSG_TYPE_DISCOVER) {
 
-                                        logger.debug("DHCPDISCOVER from " + inPkt.getAddress().toString());
+                                        logger.debug("DHCPDISCOVER from " + inPkt.getAddress().toString() + " " + pkt.getOpt82RemoteID());
 
                                         try {
                                             InetAddress ip = InetAddress.getByName("172.17.0.54");
@@ -65,7 +63,7 @@ public class NccDhcpServer {
 
                                     if (pkt.getType() == NccDhcpPacket.DHCP_MSG_TYPE_REQUEST) {
 
-                                        logger.debug("DHCPREQUEST from " + inPkt.getAddress().toString());
+                                        logger.debug("DHCPREQUEST from " + inPkt.getAddress().toString() + " " + pkt.getOpt82RemoteID());
 
                                         try {
                                             InetAddress ip = InetAddress.getByName("172.17.0.54");
@@ -88,8 +86,10 @@ public class NccDhcpServer {
 
                                     if (pkt.getType() == NccDhcpPacket.DHCP_MSG_TYPE_RELEASE) {
 
-                                        logger.debug("DHCPRELEASE from " + inPkt.getAddress().toString());
+                                        logger.debug("DHCPRELEASE from " + inPkt.getAddress().toString() + " " + pkt.getOpt82RemoteID());
                                     }
+                                } catch (NccDhcpException e) {
+                                    e.printStackTrace();
                                 }
                             }
                         });

@@ -1,17 +1,14 @@
 package com;
 
 import com.NccAPI.NccAPI;
-import com.NccDhcp.NccDhcp;
 import com.NccDhcp.NccDhcpServer;
 import com.NccRadius.NccRadius;
 import com.NccSystem.SQL.NccSQLPool;
 import org.apache.commons.configuration.*;
 import org.apache.log4j.*;
-import org.apache.log4j.jmx.LoggerDynamicMBean;
 
 import java.io.IOException;
 import java.sql.*;
-import java.util.concurrent.TimeUnit;
 
 // TODO: 15.01.2016 override class RadiusServer to serve BindException exceptions
 
