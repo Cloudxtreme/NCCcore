@@ -39,8 +39,6 @@ public class Ncc {
         CompositeConfiguration config = new CompositeConfiguration();
         String current = new java.io.File(".").getCanonicalPath();
 
-        System.out.println("Current dir: " + current);
-
         try {
             config.addConfiguration(new SystemConfiguration());
             config.addConfiguration(new PropertiesConfiguration("config.properties"));
