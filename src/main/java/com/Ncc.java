@@ -2,6 +2,7 @@ package com;
 
 import com.NccAPI.NccAPI;
 import com.NccDhcp.NccDhcp;
+import com.NccDhcp.NccDhcpServer;
 import com.NccRadius.NccRadius;
 import com.NccSystem.SQL.NccSQLPool;
 import org.apache.commons.configuration.*;
@@ -18,7 +19,7 @@ public class Ncc {
 
     private static NccRadius nccRadius;
     private static NccAPI nccAPI;
-    private static NccDhcp nccDhcp;
+    private static NccDhcpServer nccDhcp;
     public static NccSQLPool sqlPool;
     private static Logger logger = Logger.getRootLogger();
     private static String logLevel = "DEBUG";
@@ -93,7 +94,7 @@ public class Ncc {
 
         if (moduleDHCP) {
             logger.info("Starting DHCP");
-            nccDhcp = new NccDhcp();
+            nccDhcp = new NccDhcpServer();
             nccDhcp.start();
         }
 

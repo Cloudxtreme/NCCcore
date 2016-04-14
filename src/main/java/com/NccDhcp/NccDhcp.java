@@ -18,10 +18,9 @@ import org.apache.log4j.Logger;
 import javax.annotation.CheckForNull;
 import javax.annotation.CheckForSigned;
 import javax.annotation.Nonnull;
+import javax.xml.bind.DatatypeConverter;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.UnknownHostException;
+import java.net.*;
 
 public class NccDhcp {
     private static Logger logger = Logger.getLogger(NccDhcp.class);
@@ -33,7 +32,7 @@ public class NccDhcp {
         DhcpServer dhcpServer = new DhcpServer(nccLeaseManager);
         try {
             dhcpServer.addDefaultInterfaces();
-            dhcpServer.addInterface(InterfaceAddress.forString("93.170.48.5"));
+            //dhcpServer.addInterface(InterfaceAddress.forString("93.170.48.8"));
             dhcpServer.start();
         } catch (IOException e) {
             e.printStackTrace();
@@ -41,4 +40,5 @@ public class NccDhcp {
             e.printStackTrace();
         }
     }
+
 }
