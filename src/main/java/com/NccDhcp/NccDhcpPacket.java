@@ -4,6 +4,7 @@ import org.apache.log4j.Logger;
 
 import javax.xml.bind.DatatypeConverter;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 
 public class NccDhcpPacket {
@@ -23,6 +24,7 @@ public class NccDhcpPacket {
     public byte[] dhcpClientMACAddress;
     public byte[] dhcpMagicCookie;
     public byte[] dhcpClientID;
+    public byte[] dhcpRawOpt82;
 
     public byte[] dhcpOpt82CircuitID;
     public byte[] dhcpOpt82RemoteID;
@@ -156,9 +158,19 @@ public class NccDhcpPacket {
 
             if (data[i] == DHCP_OPTION_82_RELAY_AGENT) {
                 i++;
+
                 Integer len = ba2int(baSubstr(data, i, 1));
                 if (len < 1) break;
+
                 i++;
+
+                this.dhcpRawOpt82 = new byte[len];
+                int m = 0;
+                for (int n = i; n < i + len; n++) {
+                    this.dhcpRawOpt82[m] = data[n];
+                    m++;
+                }
+
                 for (int j = i; j < i + len; j++) {
                     if (data[j] == DHCP_RELAY_AGENT_CIRCUIT_ID) {
                         j++;
@@ -190,6 +202,7 @@ public class NccDhcpPacket {
                         continue;
                     }
                 }
+
                 i += len - 1;
                 continue;
             }
@@ -242,37 +255,75 @@ public class NccDhcpPacket {
         return 0;
     }
 
+    String ba2mac(byte[] data) {
+        StringBuilder sb = new StringBuilder();
+
+        for (int i = 0; i < data.length; i++) {
+            sb.append(String.format("%02X%s", data[i], (i < data.length - 1) ? ":" : ""));
+        }
+
+        return sb.toString();
+    }
+
     int getType() {
         int type = ba2int(this.dhcpMsgType);
 
         return type;
     }
 
-    String getOpt82RemoteID() {
-
-        if (this.dhcpOpt82RemoteID != null) {
-            StringBuilder sb = new StringBuilder();
-
-            for (int i = 0; i < this.dhcpOpt82RemoteID.length; i++) {
-                sb.append(String.format("%02X%s", this.dhcpOpt82RemoteID[i], (i < this.dhcpOpt82RemoteID.length - 1) ? ":" : ""));
-            }
-
-            return sb.toString();
+    String getClientID() {
+        if (this.dhcpClientID != null) {
+            return ba2mac(this.dhcpClientID);
         }
 
         return "";
     }
 
+    String getOpt82RemoteID() {
+
+        if (this.dhcpOpt82RemoteID != null) {
+            return ba2mac(this.dhcpOpt82RemoteID);
+        }
+
+        return "";
+    }
+
+    InetAddress getRelayAgent() {
+
+        if (this.dhcpRelayAgentIP != null) {
+            try {
+                return InetAddress.getByAddress(this.dhcpRelayAgentIP);
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return null;
+    }
+
     byte[] buildReply(byte type, InetAddress clientIP, InetAddress netmask, InetAddress gateway, InetAddress dns, int leaseTime) {
 
         byte[] data = new byte[332];
+        int p = 0;
 
+        // msg reply
         data[0] = 0x02;
-        data[1] = 0x01;
-        data[2] = 0x06;
-        data[3] = 0x00;
+        p++;
 
-        byte[] bootpFlags = {0, 0};
+        // hwType
+        data[1] = 0x01;
+        p++;
+
+        // hwAddrLen
+        data[2] = 0x06;
+        p++;
+
+        // hops
+        data[3] = 0x00;
+        p++;
+
+        // 0000 - unicast, 8000 - broadcast
+        byte[] bootpFlags = {(byte) 0x00, (byte) 0x00};
         byte[] zaddr = {0, 0, 0, 0};
         byte[] padding10 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         byte[] opt53 = {53, 1, type};
@@ -281,30 +332,93 @@ public class NccDhcpPacket {
         byte[] opt1 = {1, 4};
         byte[] opt3 = {3, 4};
         byte[] opt6 = {6, 4};
+        byte[] opt82 = {82, (byte) this.dhcpRawOpt82.length};
         byte[] opt255 = {(byte) 0xff};
 
-        data = baInsert(data, 4, this.dhcpTransID);
-        data = baInsert(data, 8, this.dhcpSecsElapsed);
-        data = baInsert(data, 10, bootpFlags);
-        data = baInsert(data, 12, zaddr);
-        data = baInsert(data, 16, clientIP.getAddress());
-        data = baInsert(data, 20, zaddr);
-        data = baInsert(data, 24, this.dhcpRelayAgentIP);
-        data = baInsert(data, 28, this.dhcpClientMACAddress);
-        data = baInsert(data, 34, padding10);
-        data = baInsert(data, 236, DHCP_MAGIC_COOKIE);
-        data = baInsert(data, 240, opt53);
-        data = baInsert(data, 243, opt54);
-        data = baInsert(data, 245, gateway.getAddress());
-        data = baInsert(data, 249, opt51);
-        data = baInsert(data, 251, ByteBuffer.allocate(4).putInt(leaseTime).array());
-        data = baInsert(data, 255, opt1);
-        data = baInsert(data, 257, netmask.getAddress());
-        data = baInsert(data, 261, opt3);
-        data = baInsert(data, 263, gateway.getAddress());
-        data = baInsert(data, 267, opt6);
-        data = baInsert(data, 269, dns.getAddress());
-        data = baInsert(data, 273, opt255);
+        data = baInsert(data, p, this.dhcpTransID);
+        p += this.dhcpTransID.length;
+
+        data = baInsert(data, p, this.dhcpSecsElapsed);
+        p += this.dhcpSecsElapsed.length;
+
+        data = baInsert(data, p, bootpFlags);
+        p += bootpFlags.length;
+
+        // ciaddr
+        data = baInsert(data, p, zaddr);
+        p += zaddr.length;
+
+        // yiaddr
+        data = baInsert(data, p, clientIP.getAddress());
+        p += clientIP.getAddress().length;
+
+        // next server
+        data = baInsert(data, p, zaddr);
+        p += zaddr.length;
+
+        // relay agent
+        data = baInsert(data, p, this.dhcpRelayAgentIP);
+        p += this.dhcpRelayAgentIP.length;
+
+        data = baInsert(data, p, this.dhcpClientMACAddress);
+        p += this.dhcpClientMACAddress.length;
+
+        data = baInsert(data, p, padding10);
+        p += padding10.length;
+
+        // server hostname
+        p += 64;
+
+        // boot file
+        p += 128;
+
+        data = baInsert(data, p, DHCP_MAGIC_COOKIE);
+        p += DHCP_MAGIC_COOKIE.length;
+
+        // msg type
+        data = baInsert(data, p, opt53);
+        p += opt53.length;
+
+        // dhcp server
+        data = baInsert(data, p, opt54);
+        p += opt54.length;
+        data = baInsert(data, p, gateway.getAddress());
+        p += gateway.getAddress().length;
+
+        // lease time
+        data = baInsert(data, p, opt51);
+        p += opt51.length;
+        data = baInsert(data, p, ByteBuffer.allocate(4).putInt(leaseTime).array());
+        p += ByteBuffer.allocate(4).putInt(leaseTime).array().length;
+
+        // netmask
+        data = baInsert(data, p, opt1);
+        p += opt1.length;
+        data = baInsert(data, p, netmask.getAddress());
+        p += netmask.getAddress().length;
+
+        // router
+        data = baInsert(data, p, opt3);
+        p += opt3.length;
+        data = baInsert(data, p, gateway.getAddress());
+        p += gateway.getAddress().length;
+
+        // dns
+        data = baInsert(data, p, opt6);
+        p += opt6.length;
+        data = baInsert(data, p, dns.getAddress());
+        p += dns.getAddress().length;
+
+        // opt82
+        if (this.dhcpRawOpt82 != null) {
+            data = baInsert(data, p, opt82);
+            p += opt82.length;
+            data = baInsert(data, p, this.dhcpRawOpt82);
+            p += this.dhcpRawOpt82.length;
+        }
+
+        // end
+        data = baInsert(data, p, opt255);
 
         return data;
     }

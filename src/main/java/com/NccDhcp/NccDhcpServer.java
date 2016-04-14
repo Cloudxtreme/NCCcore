@@ -40,12 +40,14 @@ public class NccDhcpServer {
 
                                     if (pkt.getType() == NccDhcpPacket.DHCP_MSG_TYPE_DISCOVER) {
 
-                                        logger.debug("DHCPDISCOVER from " + inPkt.getAddress().toString() + " " + pkt.getOpt82RemoteID());
+                                        logger.debug("DHCPDISCOVER from " + inPkt.getAddress().toString());
+
+                                        logger.debug("RelayAgent: " + pkt.getRelayAgent().getHostAddress() + " remoteID: " + pkt.getOpt82RemoteID() + " clientID: " + pkt.getClientID());
 
                                         try {
-                                            InetAddress ip = InetAddress.getByName("172.17.0.54");
+                                            InetAddress ip = InetAddress.getByName("172.16.0.54");
                                             InetAddress netmask = InetAddress.getByName("255.255.0.0");
-                                            InetAddress gateway = InetAddress.getByName("172.17.0.1");
+                                            InetAddress gateway = InetAddress.getByName("172.16.0.1");
                                             InetAddress dns = InetAddress.getByName("151.0.48.67");
 
                                             byte[] dhcpReply = pkt.buildReply(NccDhcpPacket.DHCP_MSG_TYPE_OFFER, ip, netmask, gateway, dns, 300);
@@ -66,9 +68,9 @@ public class NccDhcpServer {
                                         logger.debug("DHCPREQUEST from " + inPkt.getAddress().toString() + " " + pkt.getOpt82RemoteID());
 
                                         try {
-                                            InetAddress ip = InetAddress.getByName("172.17.0.54");
+                                            InetAddress ip = InetAddress.getByName("172.16.0.54");
                                             InetAddress netmask = InetAddress.getByName("255.255.0.0");
-                                            InetAddress gateway = InetAddress.getByName("172.17.0.1");
+                                            InetAddress gateway = InetAddress.getByName("172.16.0.1");
                                             InetAddress dns = InetAddress.getByName("151.0.48.67");
 
                                             byte[] dhcpReply = pkt.buildReply(NccDhcpPacket.DHCP_MSG_TYPE_ACK, ip, netmask, gateway, dns, 300);
