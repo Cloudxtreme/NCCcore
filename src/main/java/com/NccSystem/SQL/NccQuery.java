@@ -75,7 +75,8 @@ public class NccQuery {
                 return ids;
             } else {
                 sql.close();
-                throw new NccQueryException("null result set: '" + query);
+                //throw new NccQueryException("null result set: '" + query);
+                return null;
             }
 
         } catch (SQLException se) {

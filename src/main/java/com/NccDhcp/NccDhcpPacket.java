@@ -24,6 +24,10 @@ public class NccDhcpPacket {
     public byte[] dhcpClientMACAddress;
     public byte[] dhcpMagicCookie;
     public byte[] dhcpClientID;
+    public byte[] dhcpClientAddressRequest;
+    public byte[] dhcpRawOpt57;
+    public byte[] dhcpRawOpt60;
+    public byte[] dhcpRawOpt61;
     public byte[] dhcpRawOpt82;
 
     public byte[] dhcpOpt82CircuitID;
@@ -115,6 +119,14 @@ public class NccDhcpPacket {
                 Integer len = ba2int(baSubstr(data, i, 1));
                 if (len < 1) break;
                 i++;
+
+                this.dhcpRawOpt61 = new byte[len];
+                int m = 0;
+                for (int n = i; n < i + len; n++) {
+                    this.dhcpRawOpt61[m] = data[n];
+                    m++;
+                }
+
                 this.dhcpClientID = baSubstr(data, i, len);
                 i += len - 1;
                 continue;
@@ -134,6 +146,14 @@ public class NccDhcpPacket {
                 Integer len = ba2int(baSubstr(data, i, 1));
                 if (len < 1) break;
                 i++;
+
+                this.dhcpRawOpt60 = new byte[len];
+                int m = 0;
+                for (int n = i; n < i + len; n++) {
+                    this.dhcpRawOpt60[m] = data[n];
+                    m++;
+                }
+
                 i += len - 1;
                 continue;
             }
@@ -152,6 +172,7 @@ public class NccDhcpPacket {
                 Integer len = ba2int(baSubstr(data, i, 1));
                 if (len < 1) break;
                 i++;
+                this.dhcpClientAddressRequest = baSubstr(data, i, len);
                 i += len - 1;
                 continue;
             }
@@ -301,9 +322,46 @@ public class NccDhcpPacket {
         return null;
     }
 
+    InetAddress getClientIPAddress(){
+
+        if(this.dhcpClientIPAddress!=null){
+            try {
+                return InetAddress.getByAddress(this.dhcpClientIPAddress);
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return null;
+    }
+
+    String getClientMAC(){
+
+        if(this.dhcpClientMACAddress!=null){
+            return ba2mac(this.dhcpClientMACAddress);
+        }
+
+        return null;
+    }
+
+    InetAddress getAddressRequest(){
+
+        if(this.dhcpClientAddressRequest!=null){
+            try {
+                return InetAddress.getByAddress(this.dhcpClientAddressRequest);
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return null;
+    }
+
     byte[] buildReply(byte type, InetAddress clientIP, InetAddress netmask, InetAddress gateway, InetAddress dns, int leaseTime) {
 
-        byte[] data = new byte[332];
+        int PKT_LEN = 360;
+
+        byte[] data = new byte[PKT_LEN];
         int p = 0;
 
         // msg reply
@@ -332,7 +390,6 @@ public class NccDhcpPacket {
         byte[] opt1 = {1, 4};
         byte[] opt3 = {3, 4};
         byte[] opt6 = {6, 4};
-        byte[] opt82 = {82, (byte) this.dhcpRawOpt82.length};
         byte[] opt255 = {(byte) 0xff};
 
         data = baInsert(data, p, this.dhcpTransID);
@@ -409,8 +466,27 @@ public class NccDhcpPacket {
         data = baInsert(data, p, dns.getAddress());
         p += dns.getAddress().length;
 
+        // opt61
+        if (this.dhcpRawOpt61 != null) {
+            byte[] opt61 = {61, (byte) this.dhcpRawOpt61.length};
+            data = baInsert(data, p, opt61);
+            p += opt61.length;
+            data = baInsert(data, p, this.dhcpRawOpt61);
+            p += this.dhcpRawOpt61.length;
+        }
+
+        // opt60
+        if (this.dhcpRawOpt60 != null) {
+            byte[] opt60 = {60, (byte) this.dhcpRawOpt60.length};
+            data = baInsert(data, p, opt60);
+            p += opt60.length;
+            data = baInsert(data, p, this.dhcpRawOpt60);
+            p += this.dhcpRawOpt60.length;
+        }
+
         // opt82
         if (this.dhcpRawOpt82 != null) {
+            byte[] opt82 = {82, (byte) this.dhcpRawOpt82.length};
             data = baInsert(data, p, opt82);
             p += opt82.length;
             data = baInsert(data, p, this.dhcpRawOpt82);
