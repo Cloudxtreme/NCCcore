@@ -21,7 +21,7 @@ public class NccDhcpBinding {
         }
     }
 
-    public NccDhcpBindData getBinding(String remoteID, String clientMAC, Long relayAgent) {
+    public NccDhcpBindData getBinding(String remoteID, String circuitID, String clientMAC, Long relayAgent) {
 
         CachedRowSetImpl rs;
         String whereMAC = "";
@@ -31,8 +31,9 @@ public class NccDhcpBinding {
         }
 
         try {
-            rs = query.selectQuery("SELECT id, uid, remoteID, clientMAC, relayAgent FROM ncc_dhcp_user_binding WHERE " +
+            rs = query.selectQuery("SELECT id, uid, remoteID, circuitID, clientMAC, relayAgent FROM ncc_dhcp_user_binding WHERE " +
                     "remoteID='" + remoteID + "' AND " +
+                    "circuitID='" + circuitID + "' AND " +
                     whereMAC +
                     "relayAgent=" + relayAgent);
 
@@ -44,6 +45,7 @@ public class NccDhcpBinding {
                         bindData.id = rs.getInt("id");
                         bindData.uid = rs.getInt("uid");
                         bindData.remoteID = rs.getString("remoteID");
+                        bindData.circuitID = rs.getString("circuitID");
                         bindData.clientMAC = rs.getString("clientMAC");
                         bindData.relayAgent = rs.getLong("relayAgent");
 
@@ -60,7 +62,7 @@ public class NccDhcpBinding {
         return null;
     }
 
-    public void setUnbinded(String remoteID, String clientMAC, Long relayAgent) {
+    public void setUnbinded(String remoteID, String circuitID, String clientMAC, Long relayAgent) {
 
         ArrayList<Integer> ids;
         Long lastSeen = System.currentTimeMillis() / 1000L;
@@ -68,20 +70,34 @@ public class NccDhcpBinding {
         try {
             ids = query.updateQuery("UPDATE ncc_dhcp_unbinded SET lastSeen=" + lastSeen + ", clientMAC='" + clientMAC + "' WHERE " +
                     "remoteID='" + remoteID + "' AND " +
+                    "circuitID='" + circuitID + "' AND " +
                     "relayAgent=" + relayAgent);
 
             if (ids == null) ids = query.updateQuery("INSERT INTO ncc_dhcp_unbinded (" +
                     "lastSeen, " +
                     "remoteID, " +
+                    "circuitID, " +
                     "clientMAC, " +
                     "relayAgent) VALUES (" +
                     lastSeen + ", " +
                     "'" + remoteID + "', " +
+                    "'" + circuitID + "', " +
                     "'" + clientMAC + "', " +
                     relayAgent + ")");
 
         } catch (NccQueryException e) {
             e.printStackTrace();
         }
+    }
+
+    public void cleanupBinding(){
+        Long cleanupTime = System.currentTimeMillis() / 1000L;
+
+        try {
+            ArrayList<Integer> ids = query.updateQuery("DELETE FROM ncc_dhcp_unbinded WHERE lastSeen+120<" + cleanupTime);
+        } catch (NccQueryException e) {
+            e.printStackTrace();
+        }
+
     }
 }

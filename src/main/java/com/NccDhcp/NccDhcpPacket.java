@@ -62,6 +62,7 @@ public class NccDhcpPacket {
     private static int DHCP_OPTIONS_OFFSET = 0xF0;
 
     private static int DHCP_OPTION_12_HOSTNAME = 12;
+    private static int DHCP_OPTION_43_VENDOR_SPECIFIC = 43;
     private static int DHCP_OPTION_50_ADDRESS_REQ = 50;
     private static int DHCP_OPTION_53_MSG_TYPE = 53;
     private static int DHCP_OPTION_55_PARAM_LIST = 55;
@@ -309,6 +310,15 @@ public class NccDhcpPacket {
         return "";
     }
 
+    String getOpt82CircuitID() {
+
+        if (this.dhcpOpt82CircuitID != null) {
+            return ba2mac(this.dhcpOpt82CircuitID);
+        }
+
+        return "";
+    }
+
     InetAddress getRelayAgent() {
 
         if (this.dhcpRelayAgentIP != null) {
@@ -322,9 +332,9 @@ public class NccDhcpPacket {
         return null;
     }
 
-    InetAddress getClientIPAddress(){
+    InetAddress getClientIPAddress() {
 
-        if(this.dhcpClientIPAddress!=null){
+        if (this.dhcpClientIPAddress != null) {
             try {
                 return InetAddress.getByAddress(this.dhcpClientIPAddress);
             } catch (UnknownHostException e) {
@@ -335,18 +345,18 @@ public class NccDhcpPacket {
         return null;
     }
 
-    String getClientMAC(){
+    String getClientMAC() {
 
-        if(this.dhcpClientMACAddress!=null){
+        if (this.dhcpClientMACAddress != null) {
             return ba2mac(this.dhcpClientMACAddress);
         }
 
         return null;
     }
 
-    InetAddress getAddressRequest(){
+    InetAddress getAddressRequest() {
 
-        if(this.dhcpClientAddressRequest!=null){
+        if (this.dhcpClientAddressRequest != null) {
             try {
                 return InetAddress.getByAddress(this.dhcpClientAddressRequest);
             } catch (UnknownHostException e) {
@@ -357,7 +367,7 @@ public class NccDhcpPacket {
         return null;
     }
 
-    byte[] buildReply(byte type, InetAddress clientIP, InetAddress netmask, InetAddress gateway, InetAddress dns, int leaseTime) {
+    byte[] buildReply(byte type, InetAddress localIP, InetAddress clientIP, InetAddress netmask, InetAddress router, InetAddress dns, int leaseTime) {
 
         int PKT_LEN = 360;
 
@@ -381,16 +391,20 @@ public class NccDhcpPacket {
         p++;
 
         // 0000 - unicast, 8000 - broadcast
-        byte[] bootpFlags = {(byte) 0x00, (byte) 0x00};
+        byte[] bootpFlags = this.dhcpBootpFlags;
         byte[] zaddr = {0, 0, 0, 0};
         byte[] padding10 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         byte[] opt53 = {53, 1, type};
         byte[] opt54 = {54, 4};
         byte[] opt51 = {51, 4};
+        byte[] opt50 = {50, 4};
+        byte[] opt43 = {43, 6};
         byte[] opt1 = {1, 4};
         byte[] opt3 = {3, 4};
         byte[] opt6 = {6, 4};
         byte[] opt255 = {(byte) 0xff};
+
+        if (localIP == null) localIP = router;
 
         data = baInsert(data, p, this.dhcpTransID);
         p += this.dhcpTransID.length;
@@ -410,8 +424,8 @@ public class NccDhcpPacket {
         p += clientIP.getAddress().length;
 
         // next server
-        data = baInsert(data, p, zaddr);
-        p += zaddr.length;
+        data = baInsert(data, p, localIP.getAddress());
+        p += localIP.getAddress().length;
 
         // relay agent
         data = baInsert(data, p, this.dhcpRelayAgentIP);
@@ -432,22 +446,6 @@ public class NccDhcpPacket {
         data = baInsert(data, p, DHCP_MAGIC_COOKIE);
         p += DHCP_MAGIC_COOKIE.length;
 
-        // msg type
-        data = baInsert(data, p, opt53);
-        p += opt53.length;
-
-        // dhcp server
-        data = baInsert(data, p, opt54);
-        p += opt54.length;
-        data = baInsert(data, p, gateway.getAddress());
-        p += gateway.getAddress().length;
-
-        // lease time
-        data = baInsert(data, p, opt51);
-        p += opt51.length;
-        data = baInsert(data, p, ByteBuffer.allocate(4).putInt(leaseTime).array());
-        p += ByteBuffer.allocate(4).putInt(leaseTime).array().length;
-
         // netmask
         data = baInsert(data, p, opt1);
         p += opt1.length;
@@ -457,8 +455,8 @@ public class NccDhcpPacket {
         // router
         data = baInsert(data, p, opt3);
         p += opt3.length;
-        data = baInsert(data, p, gateway.getAddress());
-        p += gateway.getAddress().length;
+        data = baInsert(data, p, router.getAddress());
+        p += router.getAddress().length;
 
         // dns
         data = baInsert(data, p, opt6);
@@ -466,23 +464,51 @@ public class NccDhcpPacket {
         data = baInsert(data, p, dns.getAddress());
         p += dns.getAddress().length;
 
+        // msg type
+        data = baInsert(data, p, opt53);
+        p += opt53.length;
+
+        // req address
+        data = baInsert(data, p, opt50);
+        p += opt50.length;
+        data = baInsert(data, p, clientIP.getAddress());
+        p += clientIP.getAddress().length;
+
+        // lease time
+        data = baInsert(data, p, opt51);
+        p += opt51.length;
+        data = baInsert(data, p, ByteBuffer.allocate(4).putInt(leaseTime).array());
+        p += ByteBuffer.allocate(4).putInt(leaseTime).array().length;
+
+        // vendor specific
+        data = baInsert(data, p, opt43);
+        p += opt43.length;
+        data = baInsert(data, p, new byte[]{(byte) 0x01, (byte) 0x04, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x02});
+        p += 6;
+
+        // dhcp server
+        data = baInsert(data, p, opt54);
+        p += opt54.length;
+        data = baInsert(data, p, localIP.getAddress());
+        p += localIP.getAddress().length;
+
         // opt61
-        if (this.dhcpRawOpt61 != null) {
-            byte[] opt61 = {61, (byte) this.dhcpRawOpt61.length};
-            data = baInsert(data, p, opt61);
-            p += opt61.length;
-            data = baInsert(data, p, this.dhcpRawOpt61);
-            p += this.dhcpRawOpt61.length;
-        }
+//        if (this.dhcpRawOpt61 != null) {
+//            byte[] opt61 = {61, (byte) this.dhcpRawOpt61.length};
+//            data = baInsert(data, p, opt61);
+//            p += opt61.length;
+//            data = baInsert(data, p, this.dhcpRawOpt61);
+//            p += this.dhcpRawOpt61.length;
+//        }
 
         // opt60
-        if (this.dhcpRawOpt60 != null) {
-            byte[] opt60 = {60, (byte) this.dhcpRawOpt60.length};
-            data = baInsert(data, p, opt60);
-            p += opt60.length;
-            data = baInsert(data, p, this.dhcpRawOpt60);
-            p += this.dhcpRawOpt60.length;
-        }
+//        if (this.dhcpRawOpt60 != null) {
+//            byte[] opt60 = {60, (byte) this.dhcpRawOpt60.length};
+//            data = baInsert(data, p, opt60);
+//            p += opt60.length;
+//            data = baInsert(data, p, this.dhcpRawOpt60);
+//            p += this.dhcpRawOpt60.length;
+//        }
 
         // opt82
         if (this.dhcpRawOpt82 != null) {

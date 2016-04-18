@@ -216,6 +216,10 @@ public class NccDhcpLeases {
         return null;
     }
 
+    public void releaseLease(){
+
+    }
+
     public void cleanupLeases() {
         Long cleanupTime = System.currentTimeMillis() / 1000L;
 
@@ -224,6 +228,5 @@ public class NccDhcpLeases {
         } catch (NccQueryException e) {
             e.printStackTrace();
         }
-
     }
 }

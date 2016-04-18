@@ -1,6 +1,7 @@
 package com.NccDhcp;
 
 import com.NccSystem.NccUtils;
+import com.google.common.net.InetAddresses;
 import com.google.common.primitives.Ints;
 import com.googlecode.jsonrpc4j.JsonRpcClient;
 import com.googlecode.jsonrpc4j.JsonRpcHttpClient;
@@ -37,7 +38,9 @@ public class NccDhcpServer {
                     @Override
                     public void run() {
                         NccDhcpLeases leases = new NccDhcpLeases();
+                        NccDhcpBinding binding = new NccDhcpBinding();
                         leases.cleanupLeases();
+                        binding.cleanupBinding();
                     }
                 }
 
@@ -60,6 +63,24 @@ public class NccDhcpServer {
 
                         Thread dhcpReceiveThread = new Thread(new Runnable() {
 
+                            boolean checkBind(String remoteID, String circuitID, String clientMAC, Long relayAgent) {
+                                NccDhcpBindData bindData = new NccDhcpBinding().getBinding(remoteID, circuitID, clientMAC, relayAgent);
+
+                                if (bindData != null) {
+                                    logger.debug("User binded: uid=" + bindData.uid);
+                                    return true;
+                                } else {
+                                    try {
+                                        logger.debug("Unbinded user: remoteID=" + remoteID + " circuitID=" + circuitID + " clientMAC=" + clientMAC + " relayAgent=" + NccUtils.long2ip(relayAgent));
+                                    } catch (UnknownHostException e) {
+                                        e.printStackTrace();
+                                    }
+                                    if (!remoteID.equals(""))
+                                        new NccDhcpBinding().setUnbinded(remoteID, circuitID, clientMAC, relayAgent);
+                                    return false;
+                                }
+                            }
+
                             @Override
                             public void run() {
 
@@ -70,11 +91,18 @@ public class NccDhcpServer {
 
                                         logger.debug("DHCPDISCOVER from " + inPkt.getAddress().toString());
 
-                                        logger.debug("RelayAgent: " + pkt.getRelayAgent().getHostAddress() + " remoteID: " + pkt.getOpt82RemoteID() + " clientID: " + pkt.getClientID());
+                                        logger.debug("RelayAgent: " + pkt.getRelayAgent().getHostAddress() + " remoteID: " + pkt.getOpt82RemoteID() + " circuitID: " + pkt.getOpt82CircuitID() + " clientID: " + pkt.getClientID());
 
+                                        InetAddress localIP = null;
+                                        try {
+                                            localIP = InetAddress.getByName("93.170.48.8");
+                                        } catch (UnknownHostException e) {
+                                            e.printStackTrace();
+                                        }
                                         InetAddress agentIP = pkt.getRelayAgent();
                                         String clientMAC = pkt.getClientMAC();
                                         String remoteID = pkt.getOpt82RemoteID();
+                                        String circuitID = pkt.getOpt82CircuitID();
                                         Long relayAgent = null;
                                         try {
                                             relayAgent = NccUtils.ip2long(agentIP.getHostAddress());
@@ -82,15 +110,12 @@ public class NccDhcpServer {
                                             e.printStackTrace();
                                         }
 
-                                        NccDhcpBindData bindData = new NccDhcpBinding().getBinding(remoteID, clientMAC, relayAgent);
-
-                                        if (bindData != null) {
-                                            logger.debug("User binded: " + bindData.uid);
-                                        } else {
-                                            logger.debug("Unbinded user");
-                                            new NccDhcpBinding().setUnbinded(remoteID, clientMAC, relayAgent);
+                                        if (remoteID.equals("")) {
+                                            logger.debug("Empty remoteID");
                                             return;
                                         }
+
+                                        if (!checkBind(remoteID, circuitID, clientMAC, relayAgent)) return;
 
                                         try {
 
@@ -112,15 +137,18 @@ public class NccDhcpServer {
                                                     InetAddress router = InetAddress.getByName(NccUtils.long2ip(leaseData.leaseRouter));
                                                     InetAddress dns = InetAddress.getByName(NccUtils.long2ip(leaseData.leaseDNS1));
 
-                                                    byte[] dhcpReply = pkt.buildReply(NccDhcpPacket.DHCP_MSG_TYPE_OFFER, ip, netmask, router, dns, poolData.poolLeaseTime);
+                                                    byte[] dhcpReply = pkt.buildReply(NccDhcpPacket.DHCP_MSG_TYPE_OFFER, localIP, ip, netmask, router, dns, poolData.poolLeaseTime);
 
-                                                    DatagramPacket outPkt = new DatagramPacket(dhcpReply, dhcpReply.length, inPkt.getAddress(), inPkt.getPort());
+                                                    logger.debug("Send DHCPOFFER to " + inPkt.getAddress().getHostAddress() + ":" + inPkt.getPort());
+                                                    DatagramPacket outPkt = new DatagramPacket(dhcpReply, dhcpReply.length, inPkt.getAddress(), 67);
                                                     try {
                                                         dhcpSocket.send(outPkt);
                                                     } catch (IOException e) {
                                                         logger.error("Can't write to socket");
                                                     }
                                                 }
+                                            } else {
+                                                logger.debug("Pool for relay agent " + NccUtils.long2ip(relayAgent) + " not found");
                                             }
 
                                         } catch (UnknownHostException e) {
@@ -130,11 +158,33 @@ public class NccDhcpServer {
 
                                     if (pkt.getType() == NccDhcpPacket.DHCP_MSG_TYPE_REQUEST) {
 
-                                        logger.debug("DHCPREQUEST from " + inPkt.getAddress().toString() + " " + pkt.getOpt82RemoteID());
+                                        logger.debug("DHCPREQUEST from " + inPkt.getAddress().toString());
+
+                                        logger.debug("RelayAgent: " + pkt.getRelayAgent().getHostAddress() + " remoteID: " + pkt.getOpt82RemoteID() + " circuitID: " + pkt.getOpt82CircuitID() + " clientID: " + pkt.getClientID());
 
                                         InetAddress agentIP = pkt.getRelayAgent();
                                         String clientMAC = pkt.getClientMAC();
                                         String remoteID = pkt.getOpt82RemoteID();
+                                        String circuitID = pkt.getOpt82CircuitID();
+                                        InetAddress localIP = null;
+                                        try {
+                                            localIP = InetAddress.getByName("93.170.48.8");
+                                        } catch (UnknownHostException e) {
+                                            e.printStackTrace();
+                                        }
+                                        Long relayAgent = null;
+                                        try {
+                                            relayAgent = NccUtils.ip2long(agentIP.getHostAddress());
+                                        } catch (UnknownHostException e) {
+                                            e.printStackTrace();
+                                        }
+
+                                        if (remoteID.equals("")) {
+                                            logger.debug("Empty remoteID");
+                                            return;
+                                        }
+
+                                        if (!checkBind(remoteID, circuitID, clientMAC, relayAgent)) return;
 
                                         InetAddress clientIP = pkt.getClientIPAddress();
                                         InetAddress reqIP = pkt.getAddressRequest();
@@ -191,13 +241,14 @@ public class NccDhcpServer {
 
                                             NccDhcpPoolData poolData = new NccDhcpPools().getPool(lease.leasePool);
 
-                                            dhcpReply = pkt.buildReply(NccDhcpPacket.DHCP_MSG_TYPE_ACK, ip, netmask, router, dns, poolData.poolLeaseTime);
+                                            dhcpReply = pkt.buildReply(NccDhcpPacket.DHCP_MSG_TYPE_ACK, localIP, ip, netmask, router, dns, poolData.poolLeaseTime);
                                         } else {
                                             logger.error("Lease not found for " + clientMAC);
-                                            dhcpReply = pkt.buildReply(NccDhcpPacket.DHCP_MSG_TYPE_NAK, ip, netmask, router, dns, 300);
+                                            dhcpReply = pkt.buildReply(NccDhcpPacket.DHCP_MSG_TYPE_NAK, localIP, ip, netmask, router, dns, 300);
                                         }
 
-                                        DatagramPacket outPkt = new DatagramPacket(dhcpReply, dhcpReply.length, inPkt.getAddress(), inPkt.getPort());
+                                        logger.debug("Send DHCPACK/NAK to " + inPkt.getAddress().getHostAddress() + ":" + inPkt.getPort());
+                                        DatagramPacket outPkt = new DatagramPacket(dhcpReply, dhcpReply.length, inPkt.getAddress(), 67);
                                         try {
                                             dhcpSocket.send(outPkt);
                                         } catch (IOException e) {
@@ -207,7 +258,8 @@ public class NccDhcpServer {
 
                                     if (pkt.getType() == NccDhcpPacket.DHCP_MSG_TYPE_RELEASE) {
 
-                                        logger.debug("DHCPRELEASE from " + inPkt.getAddress().toString() + " " + pkt.getOpt82RemoteID());
+                                        logger.debug("DHCPRELEASE from " + inPkt.getAddress().toString());
+                                        logger.debug("RelayAgent: " + pkt.getRelayAgent().getHostAddress() + " remoteID: " + pkt.getOpt82RemoteID() + " circuitID: " + pkt.getOpt82CircuitID() + " clientID: " + pkt.getClientID());
                                     }
                                 } catch (
                                         NccDhcpException e
