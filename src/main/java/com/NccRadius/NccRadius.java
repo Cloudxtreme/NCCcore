@@ -45,6 +45,7 @@ public class NccRadius extends RadiusServer {
     private static String radSecret = "";
     private static NccUsers nccUsers;
     private static NccAccounts nccAccounts;
+    private static boolean dbg = true;
 
     @Override
     public String getSharedSecret(InetSocketAddress inetSocketAddress) {
@@ -347,8 +348,9 @@ public class NccRadius extends RadiusServer {
         String reqUserName = req.getUserName();
         String reqUserPassword = req.getUserPassword();
         Integer reqPacketIdentifier = req.getPacketIdentifier();
+        String reqServiceType = req.getServiceType();
 
-        logger.debug("Access-Request '" + reqUserName + "'");
+        logger.debug("Access-Request '" + reqUserName + "' Service-Type '" + reqServiceType + "'");
 
         RadiusPacket radiusPacket = new RadiusPacket();
         Integer packetType = RadiusPacket.ACCESS_REJECT;
@@ -368,6 +370,14 @@ public class NccRadius extends RadiusServer {
             nasData = nccNAS.getNasByIP(nasIP);
         } catch (NccNasException e) {
             logger.error("NAS error: " + e.getMessage());
+            return radiusPacket;
+        }
+
+        if (reqServiceType.equals("Outbound-User")){
+            packetType = RadiusPacket.ACCESS_ACCEPT;
+            radiusPacket.addAttribute("SSG-Service-Info", "QU;71680000;35840000;71680000;D;71680000;35840000;71680000");
+            radiusPacket.setPacketIdentifier(reqPacketIdentifier);
+            radiusPacket.setPacketType(packetType);
             return radiusPacket;
         }
 
