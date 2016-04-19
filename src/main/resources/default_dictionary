@@ -254,4 +254,12 @@ VENDORATTR      311     MS-CHAP2-Response               25      octets
 
 VENDOR          9       Cisco
 
+VENDORATTR      9       avpair                          1       string
+VENDORATTR      9       Pre-Input-Octets                190     integer
+VENDORATTR      9       Pre-Output-Octets               191     integer
+VENDORATTR      9       Pre-Input-Packets               192     integer
+VENDORATTR      9       Pre-Output-Packets              193     integer
+VENDORATTR      9       Disconnect-Cause                195     integer
+VENDORATTR      9       Connection-Progress             196     integer
+VENDORATTR      9       PreSession-Time                 198     integer
 VENDORATTR      9       SSG-Service-Info                251     string

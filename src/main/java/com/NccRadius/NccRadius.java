@@ -106,341 +106,393 @@ public class NccRadius extends RadiusServer {
         setAcctPort(radAcctPort);
     }
 
-    public RadiusPacket accountingRequestReceived(AccountingRequest accountingRequest, InetSocketAddress client) {
+    public RadiusPacket accountingRequestReceived(AccountingRequest accReq, InetSocketAddress accClient) {
 
-        RadiusPacket radiusPacket = new RadiusPacket();
-        Integer packetIdentifier = accountingRequest.getPacketIdentifier();
-        Integer packetType = accountingRequest.getPacketType();
-        Integer statusType = 0;
 
-        try {
-            statusType = accountingRequest.getAcctStatusType();
-        } catch (RadiusException e) {
-            e.printStackTrace();
-        }
+        final AccountingRequest accountingRequest = accReq;
+        final InetSocketAddress client = accClient;
 
-        switch (packetType) {
-            case RadiusPacket.ACCOUNTING_REQUEST:
-                radiusPacket.setPacketType(RadiusPacket.ACCOUNTING_RESPONSE);
-                radiusPacket.setPacketIdentifier(packetIdentifier);
+        class AccountingThread implements Runnable {
 
-                String userLogin = "";
-                String sessionID = "";
-                String nasPort = "";
-                String nasIP = "";
-                String nasPortType = "";
-                String nasIdentifier = "";
-                String framedIP = "";
-                String framedMAC = "";
-                Integer acctInputOctets;
-                Integer acctOutputOctets;
-                Integer acctInputGigawords;
-                Integer acctOutputGigawords;
-                String acctSessionTime = "";
-                String callingStation = "";
-                String calledStation = "";
-                String framedProtocol = "";
-                String serviceType = "";
-                String eventTimestamp = "";
-                String acctAuthentic = "";
+            private volatile RadiusPacket radiusPacket = new RadiusPacket();
+
+            public RadiusPacket getValue() {
+                return radiusPacket;
+            }
+
+            @Override
+            public void run() {
+
+                Integer packetIdentifier = accountingRequest.getPacketIdentifier();
+                Integer packetType = accountingRequest.getPacketType();
+                Integer statusType = 0;
 
                 try {
-                    userLogin = accountingRequest.getUserName();
-                    sessionID = accountingRequest.getAttributeValue("Acct-Session-Id");
-                    nasIP = accountingRequest.getAttributeValue("NAS-IP-Address");
-                    nasPort = accountingRequest.getAttributeValue("NAS-Port");
-                    nasIdentifier = accountingRequest.getAttributeValue("NAS-Identifier");
-                    nasPortType = accountingRequest.getAttributeValue("NAS-Port-Type");
-                    framedIP = accountingRequest.getAttributeValue("Framed-IP-Address");
-                    callingStation = accountingRequest.getAttributeValue("Calling-Station-Id");
-                    framedMAC = callingStation;
-                    calledStation = accountingRequest.getAttributeValue("Called-Station-Id");
-                    framedProtocol = accountingRequest.getAttributeValue("Framed-Protocol");
-                    serviceType = accountingRequest.getAttributeValue("Service-Type");
-                    eventTimestamp = accountingRequest.getAttributeValue("Event-Timestamp");
-                    acctAuthentic = accountingRequest.getAttributeValue("Acct-Authentic");
-
+                    statusType = accountingRequest.getAcctStatusType();
                 } catch (RadiusException e) {
                     e.printStackTrace();
                 }
 
-                SessionData sessionData = new SessionData();
+                switch (packetType) {
+                    case RadiusPacket.ACCOUNTING_REQUEST:
+                        radiusPacket.setPacketType(RadiusPacket.ACCOUNTING_RESPONSE);
+                        radiusPacket.setPacketIdentifier(packetIdentifier);
 
-                switch (statusType) {
-                    case AccountingRequest.ACCT_STATUS_TYPE_START:
-
-                        logger.info("Session start: '" + userLogin + "' sessionId=" + sessionID + " nasIP=" + nasIP + " nasPort=" + nasPort + " framedIP=" + framedIP + " framedMAC=" + framedMAC);
+                        String userLogin = "";
+                        String sessionID = "";
+                        String nasPort = "";
+                        String nasIP = "";
+                        String nasPortType = "";
+                        String nasIdentifier = "";
+                        String framedIP = "";
+                        String framedMAC = "";
+                        Integer acctInputOctets;
+                        Integer acctOutputOctets;
+                        Integer acctInputGigawords;
+                        Integer acctOutputGigawords;
+                        String acctSessionTime = "";
+                        String callingStation = "";
+                        String calledStation = "";
+                        String framedProtocol = "";
+                        String serviceType = "";
+                        String eventTimestamp = "";
+                        String acctAuthentic = "";
 
                         try {
-                            SessionData checkSession = new NccSessions().getSession(sessionID);
-                            if (checkSession != null) {
-                                logger.error("Duplicate session: '" + sessionID + "'");
-                                break;
-                            }
-                        } catch (NccSessionsException e) {
+                            userLogin = accountingRequest.getUserName();
+                            sessionID = accountingRequest.getAttributeValue("Acct-Session-Id");
+                            nasIP = accountingRequest.getAttributeValue("NAS-IP-Address");
+                            nasPort = accountingRequest.getAttributeValue("NAS-Port");
+                            nasIdentifier = accountingRequest.getAttributeValue("NAS-Identifier");
+                            nasPortType = accountingRequest.getAttributeValue("NAS-Port-Type");
+                            framedIP = accountingRequest.getAttributeValue("Framed-IP-Address");
+                            callingStation = accountingRequest.getAttributeValue("Calling-Station-Id");
+                            framedMAC = callingStation;
+                            calledStation = accountingRequest.getAttributeValue("Called-Station-Id");
+                            framedProtocol = accountingRequest.getAttributeValue("Framed-Protocol");
+                            serviceType = accountingRequest.getAttributeValue("Service-Type");
+                            eventTimestamp = accountingRequest.getAttributeValue("Event-Timestamp");
+                            acctAuthentic = accountingRequest.getAttributeValue("Acct-Authentic");
+
+                        } catch (RadiusException e) {
                             e.printStackTrace();
                         }
 
-                        // TODO: 21.01.2016 Get nasId from db
-                        sessionData.nasId = 1;
+                        SessionData sessionData = new SessionData();
 
-                        try {
-                            sessionData.framedIP = NccUtils.ip2long(framedIP);
-                        } catch (UnknownHostException e) {
-                            e.printStackTrace();
-                        }
-                        sessionData.framedMAC = framedMAC;
-                        sessionData.acctInputOctets = 0;
-                        sessionData.acctOutputOctets = 0;
-                        sessionData.sessionId = sessionID;
-                        sessionData.startTime = System.currentTimeMillis() / 1000L;
-                        sessionData.lastAlive = sessionData.startTime;
-                        sessionData.sessionDuration = 0L;
+                        switch (statusType) {
+                            case AccountingRequest.ACCT_STATUS_TYPE_START:
 
-                        try {
-                            UserData userData = new NccUsers().getUser(userLogin);
-                            sessionData.userId = userData.id;
-                        } catch (NccUsersException e) {
-                            e.printStackTrace();
-                        }
-
-                        try {
-                            new NccSessions().startSession(sessionData);
-                        } catch (NccSessionsException e) {
-                            e.printStackTrace();
-                        }
-
-                        break;
-                    case AccountingRequest.ACCT_STATUS_TYPE_STOP:
-
-                        logger.info("Session stop: '" + userLogin + "' sessionId=" + sessionID + " nasIP=" + nasIP + " nasPort=" + nasPort + " framedIP=" + framedIP);
-
-                        acctInputOctets = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Input-Octets"));
-                        acctOutputOctets = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Output-Octets"));
-                        acctInputGigawords = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Input-Gigawords"));
-                        acctOutputGigawords = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Output-Gigawords"));
-                        acctSessionTime = accountingRequest.getAttributeValue("Acct-Session-Time");
-                        String terminateCause = accountingRequest.getAttributeValue("Acct-Terminate-Cause");
-
-                        try {
-                            sessionData = new NccSessions().getSession(sessionID);
-                        } catch (NccSessionsException e) {
-                            e.printStackTrace();
-                        }
-
-                        if (sessionData != null) {
-                            sessionData.nasId = 1;
-
-                            try {
-                                UserData userData = new NccUsers().getUser(userLogin);
-                                sessionData.userId = userData.id;
-                            } catch (NccUsersException e) {
-                                e.printStackTrace();
-                            }
-
-
-                            switch (terminateCause) {
-                                case "User-Request":
-                                    sessionData.terminateCause = 1;
-                                    break;
-                                default:
-                                    sessionData.terminateCause = 0;
-                                    break;
-                            }
-
-                            sessionData.stopTime = System.currentTimeMillis() / 1000L;
-
-                            try {
-                                new NccSessions().stopSession(sessionData);
-                            } catch (NccSessionsException e) {
-                                e.printStackTrace();
-                            }
-                        } else {
-                            logger.error("Session not found: '" + sessionID + "'");
-
-                        }
-
-                        break;
-                    case AccountingRequest.ACCT_STATUS_TYPE_INTERIM_UPDATE:
-
-                        logger.info("Session update: '" + userLogin + "' sessionId=" + sessionID + " nasIP=" + nasIP + " nasPort=" + nasPort + " framedIP=" + framedIP);
-
-                        acctInputOctets = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Input-Octets"));
-                        acctOutputOctets = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Output-Octets"));
-                        acctInputGigawords = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Input-Gigawords"));
-                        acctOutputGigawords = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Output-Gigawords"));
-                        acctSessionTime = accountingRequest.getAttributeValue("Acct-Session-Time");
-
-                        try {
-                            sessionData = new NccSessions().getSession(sessionID);
-                        } catch (NccSessionsException e) {
-                            System.out.println("getSession(" + sessionID + ")");
-                            e.printStackTrace();
-                        }
-
-                        if (sessionData != null) {
-                            sessionData.acctInputOctets = acctInputOctets;
-                            sessionData.acctOutputOctets = acctOutputOctets;
-                            sessionData.lastAlive = System.currentTimeMillis() / 1000L;
-                            sessionData.sessionDuration = sessionData.lastAlive - sessionData.startTime;
-
-                            try {
-                                new NccSessions().updateSession(sessionData);
-                            } catch (NccSessionsException e) {
-                                e.printStackTrace();
-                            }
-                        } else {
-                            logger.error("Session not found: '" + sessionID + "'");
-                            try {
-                                SessionData resumeSession = new SessionData();
+                                logger.info("Session start: '" + userLogin + "' sessionId=" + sessionID + " nasIP=" + nasIP + " nasPort=" + nasPort + " framedIP=" + framedIP + " framedMAC=" + framedMAC);
 
                                 try {
-                                    resumeSession.framedIP = ip2long(framedIP);
-                                } catch (UnknownHostException e) {
+                                    SessionData checkSession = new NccSessions().getSession(sessionID);
+                                    if (checkSession != null) {
+                                        logger.error("Duplicate session: '" + sessionID + "'");
+                                        break;
+                                    }
+                                } catch (NccSessionsException e) {
                                     e.printStackTrace();
                                 }
 
-                                resumeSession.sessionId = sessionID;
-                                resumeSession.acctInputOctets = acctInputOctets;
-                                resumeSession.acctOutputOctets = acctOutputOctets;
                                 // TODO: 21.01.2016 Get nasId from db
-                                resumeSession.nasId = 1;
+                                sessionData.nasId = 1;
+
+                                try {
+                                    sessionData.framedIP = NccUtils.ip2long(framedIP);
+                                } catch (UnknownHostException e) {
+                                    e.printStackTrace();
+                                }
+                                sessionData.framedMAC = framedMAC;
+                                sessionData.acctInputOctets = 0;
+                                sessionData.acctOutputOctets = 0;
+                                sessionData.sessionId = sessionID;
+                                sessionData.startTime = System.currentTimeMillis() / 1000L;
+                                sessionData.lastAlive = sessionData.startTime;
+                                sessionData.sessionDuration = 0L;
 
                                 try {
                                     UserData userData = new NccUsers().getUser(userLogin);
-
-                                    if (userData != null) {
-                                        resumeSession.userId = userData.id;
-                                    }
+                                    sessionData.userId = userData.id;
                                 } catch (NccUsersException e) {
                                     e.printStackTrace();
                                 }
 
-                                resumeSession.lastAlive = System.currentTimeMillis() / 1000L;
-                                resumeSession.sessionDuration = Long.parseLong(acctSessionTime);
-                                resumeSession.startTime = resumeSession.lastAlive - resumeSession.sessionDuration;
-
-                                ArrayList<Integer> ids = new NccSessions().resumeSession(resumeSession);
-                                if (ids != null) {
-                                    logger.info("Session '" + sessionID + "' resumed");
+                                try {
+                                    new NccSessions().startSession(sessionData);
+                                } catch (NccSessionsException e) {
+                                    e.printStackTrace();
                                 }
-                            } catch (NccSessionsException e) {
-                                e.printStackTrace();
-                            }
+
+                                break;
+                            case AccountingRequest.ACCT_STATUS_TYPE_STOP:
+
+                                logger.info("Session stop: '" + userLogin + "' sessionId=" + sessionID + " nasIP=" + nasIP + " nasPort=" + nasPort + " framedIP=" + framedIP);
+
+                                acctInputOctets = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Input-Octets"));
+                                acctOutputOctets = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Output-Octets"));
+                                //acctInputGigawords = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Input-Gigawords"));
+                                //acctOutputGigawords = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Output-Gigawords"));
+                                acctSessionTime = accountingRequest.getAttributeValue("Acct-Session-Time");
+                                String terminateCause = accountingRequest.getAttributeValue("Acct-Terminate-Cause");
+
+                                try {
+                                    sessionData = new NccSessions().getSession(sessionID);
+                                } catch (NccSessionsException e) {
+                                    e.printStackTrace();
+                                }
+
+                                if (sessionData != null) {
+                                    sessionData.nasId = 1;
+
+                                    try {
+                                        UserData userData = new NccUsers().getUser(userLogin);
+                                        sessionData.userId = userData.id;
+                                    } catch (NccUsersException e) {
+                                        e.printStackTrace();
+                                    }
+
+
+                                    switch (terminateCause) {
+                                        case "User-Request":
+                                            sessionData.terminateCause = 1;
+                                            break;
+                                        default:
+                                            sessionData.terminateCause = 0;
+                                            break;
+                                    }
+
+                                    sessionData.stopTime = System.currentTimeMillis() / 1000L;
+
+                                    try {
+                                        new NccSessions().stopSession(sessionData);
+                                    } catch (NccSessionsException e) {
+                                        e.printStackTrace();
+                                    }
+                                } else {
+                                    logger.error("Session not found: '" + sessionID + "'");
+
+                                }
+
+                                break;
+                            case AccountingRequest.ACCT_STATUS_TYPE_INTERIM_UPDATE:
+
+                                logger.info("Session update: '" + userLogin + "' sessionId=" + sessionID + " nasIP=" + nasIP + " nasPort=" + nasPort + " framedIP=" + framedIP);
+
+                                acctInputOctets = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Input-Octets"));
+                                acctOutputOctets = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Output-Octets"));
+                                //acctInputGigawords = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Input-Gigawords"));
+                                //acctOutputGigawords = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Output-Gigawords"));
+                                acctSessionTime = accountingRequest.getAttributeValue("Acct-Session-Time");
+
+                                try {
+                                    sessionData = new NccSessions().getSession(sessionID);
+                                } catch (NccSessionsException e) {
+                                    System.out.println("getSession(" + sessionID + ")");
+                                    e.printStackTrace();
+                                }
+
+                                if (sessionData != null) {
+                                    sessionData.acctInputOctets = acctInputOctets;
+                                    sessionData.acctOutputOctets = acctOutputOctets;
+                                    sessionData.lastAlive = System.currentTimeMillis() / 1000L;
+                                    sessionData.sessionDuration = sessionData.lastAlive - sessionData.startTime;
+
+                                    try {
+                                        new NccSessions().updateSession(sessionData);
+                                    } catch (NccSessionsException e) {
+                                        e.printStackTrace();
+                                    }
+                                } else {
+                                    logger.error("Session not found: '" + sessionID + "'");
+                                    try {
+                                        SessionData resumeSession = new SessionData();
+
+                                        try {
+                                            resumeSession.framedIP = ip2long(framedIP);
+                                        } catch (UnknownHostException e) {
+                                            e.printStackTrace();
+                                        }
+
+                                        resumeSession.sessionId = sessionID;
+                                        resumeSession.acctInputOctets = acctInputOctets;
+                                        resumeSession.acctOutputOctets = acctOutputOctets;
+                                        // TODO: 21.01.2016 Get nasId from db
+                                        resumeSession.nasId = 1;
+
+                                        try {
+                                            UserData userData = new NccUsers().getUser(userLogin);
+
+                                            if (userData != null) {
+                                                resumeSession.userId = userData.id;
+                                            }
+                                        } catch (NccUsersException e) {
+                                            e.printStackTrace();
+                                        }
+
+                                        resumeSession.lastAlive = System.currentTimeMillis() / 1000L;
+                                        resumeSession.sessionDuration = Long.parseLong(acctSessionTime);
+                                        resumeSession.startTime = resumeSession.lastAlive - resumeSession.sessionDuration;
+
+                                        ArrayList<Integer> ids = new NccSessions().resumeSession(resumeSession);
+                                        if (ids != null) {
+                                            logger.info("Session '" + sessionID + "' resumed");
+                                        }
+                                    } catch (NccSessionsException e) {
+                                        e.printStackTrace();
+                                    }
+                                }
+                                break;
+                            default:
+                                break;
                         }
+
                         break;
                     default:
                         break;
                 }
 
-                break;
-            default:
-                break;
+            }
         }
 
-        return radiusPacket;
-    }
-
-    public RadiusPacket accessRequestReceived(AccessRequest req, InetSocketAddress addr) {
-
-        long startTime = System.nanoTime();
-
-        String reqUserName = req.getUserName();
-        String reqUserPassword = req.getUserPassword();
-        Integer reqPacketIdentifier = req.getPacketIdentifier();
-        String reqServiceType = req.getServiceType();
-
-        logger.debug("Access-Request '" + reqUserName + "' Service-Type '" + reqServiceType + "'");
-
-        RadiusPacket radiusPacket = new RadiusPacket();
-        Integer packetType = RadiusPacket.ACCESS_REJECT;
-
-        NccNasData nasData = new NccNasData();
-        Long nasIP = null;
-
+        AccountingThread accountingThread = new AccountingThread();
+        Thread thread = new Thread(accountingThread);
+        thread.start();
         try {
-            nasIP = NccUtils.ip2long(addr.getHostString());
-        } catch (UnknownHostException e) {
+            thread.join();
+        } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
-        try {
-            NccNAS nccNAS = new NccNAS();
+        return accountingThread.getValue();
+    }
 
-            nasData = nccNAS.getNasByIP(nasIP);
-        } catch (NccNasException e) {
-            logger.error("NAS error: " + e.getMessage());
-            return radiusPacket;
-        }
+    public RadiusPacket accessRequestReceived(AccessRequest accReq, InetSocketAddress accAddr) {
 
-        if (reqServiceType.equals("Outbound-User")){
-            packetType = RadiusPacket.ACCESS_ACCEPT;
-            radiusPacket.addAttribute("SSG-Service-Info", "QU;71680000;35840000;71680000;D;71680000;35840000;71680000");
-            radiusPacket.setPacketIdentifier(reqPacketIdentifier);
-            radiusPacket.setPacketType(packetType);
-            return radiusPacket;
-        }
+        final AccessRequest req = accReq;
+        final InetSocketAddress addr = accAddr;
 
-        try {
-            UserData userData = nccUsers.getUser(reqUserName);
+        class AccessThread implements Runnable {
+            private volatile RadiusPacket radiusPacket = new RadiusPacket();
 
-            try {
-                AccountData accountData = nccAccounts.getAccount(userData.accountId);
-
-                try {
-                    if (req.verifyPassword(userData.userPassword)) {
-                        if (userData.userStatus > 0) {
-
-                            if (accountData != null) if (accountData.accDeposit > -accountData.accCredit) {
-                                logger.info("Login OK: '" + reqUserName + "'");
-
-                                packetType = RadiusPacket.ACCESS_ACCEPT;
-
-                                try {
-                                    ArrayList<PoolData> pools;
-
-                                    NccTariffScale tariffScale = new NccTariffScale();
-
-                                    pools = tariffScale.getTariffPools(userData.userTariff);
-
-                                    Long framedIP = new NccSessions().getIPFromPool(pools);
-
-                                    try {
-                                        radiusPacket.addAttribute("Framed-IP-Address", NccUtils.long2ip(framedIP));
-                                        radiusPacket.addAttribute("Framed-IP-Netmask", "255.255.255.255");
-                                        radiusPacket.addAttribute("Acct-Interim-Interval", nasData.nasInterimInterval.toString());
-                                    } catch (UnknownHostException e) {
-                                        e.printStackTrace();
-                                    }
-                                } catch (NccSessionsException e) {
-                                    logger.info("Login FAIL: no enough IP in pools");
-                                }
-                            } else {
-                                logger.info("Login FAIL: deposit <= -credit");
-                            }
-                        } else {
-                            logger.info("Login FAIL: user disabled");
-                        }
-                    } else {
-                        logger.info("Login FAIL: incorrect userPassword for '" + reqUserName + "': '" + reqUserPassword + "' expected '" + userData.userPassword + "'");
-                    }
-                } catch (RadiusException re) {
-                    re.printStackTrace();
-                }
-            } catch (NccAccountsException e) {
-                logger.error(e.getMessage() + " for userId=" + userData.id);
+            public RadiusPacket getValue() {
+                return radiusPacket;
             }
 
-        } catch (NccUsersException e) {
-            logger.info("User not found: '" + reqUserName + "'");
+            @Override
+            public void run() {
+                long startTime = System.nanoTime();
+
+                String reqUserName = req.getUserName();
+                String reqUserPassword = req.getUserPassword();
+                Integer reqPacketIdentifier = req.getPacketIdentifier();
+                String reqServiceType = req.getServiceType();
+
+                logger.debug("Access-Request '" + reqUserName + "' Service-Type '" + reqServiceType + "'");
+
+                Integer packetType = RadiusPacket.ACCESS_REJECT;
+
+                NccNasData nasData = new NccNasData();
+                Long nasIP = null;
+
+                try {
+                    nasIP = NccUtils.ip2long(addr.getHostString());
+                } catch (UnknownHostException e) {
+                    e.printStackTrace();
+                }
+
+                try {
+                    NccNAS nccNAS = new NccNAS();
+
+                    nasData = nccNAS.getNasByIP(nasIP);
+                } catch (NccNasException e) {
+                    logger.error("NAS error: " + e.getMessage());
+                    return;
+                }
+
+                if (reqServiceType.equals("Outbound-User")) {
+                    packetType = RadiusPacket.ACCESS_ACCEPT;
+                    radiusPacket.addAttribute("avpair", "subscriber:accounting-list=ipoe-isg-aaa");
+                    radiusPacket.addAttribute("avpair", "ip:traffic-class=in access-group 101 priority 201");
+                    radiusPacket.addAttribute("avpair", "ip:traffic-class=out access-group 102 priority 201");
+                    radiusPacket.addAttribute("SSG-Service-Info", "QU;71680000;35840000;71680000;D;71680000;35840000;71680000");
+                    radiusPacket.setPacketIdentifier(reqPacketIdentifier);
+                    radiusPacket.setPacketType(packetType);
+                    return;
+                }
+
+                try {
+                    UserData userData = nccUsers.getUser(reqUserName);
+
+                    try {
+                        AccountData accountData = nccAccounts.getAccount(userData.accountId);
+
+                        try {
+                            if (req.verifyPassword(userData.userPassword)) {
+                                if (userData.userStatus > 0) {
+
+                                    if (accountData != null) if (accountData.accDeposit > -accountData.accCredit) {
+                                        logger.info("Login OK: '" + reqUserName + "'");
+
+                                        packetType = RadiusPacket.ACCESS_ACCEPT;
+
+                                        try {
+                                            ArrayList<PoolData> pools;
+
+                                            NccTariffScale tariffScale = new NccTariffScale();
+
+                                            pools = tariffScale.getTariffPools(userData.userTariff);
+
+                                            Long framedIP = new NccSessions().getIPFromPool(pools);
+
+                                            try {
+                                                radiusPacket.addAttribute("Framed-IP-Address", NccUtils.long2ip(framedIP));
+                                                radiusPacket.addAttribute("Framed-IP-Netmask", "255.255.255.255");
+                                                radiusPacket.addAttribute("Acct-Interim-Interval", nasData.nasInterimInterval.toString());
+                                            } catch (UnknownHostException e) {
+                                                e.printStackTrace();
+                                            }
+                                        } catch (NccSessionsException e) {
+                                            logger.info("Login FAIL: no enough IP in pools");
+                                        }
+                                    } else {
+                                        logger.info("Login FAIL: deposit <= -credit");
+                                    }
+                                } else {
+                                    logger.info("Login FAIL: user disabled");
+                                }
+                            } else {
+                                logger.info("Login FAIL: incorrect userPassword for '" + reqUserName + "': '" + reqUserPassword + "' expected '" + userData.userPassword + "'");
+                            }
+                        } catch (RadiusException re) {
+                            re.printStackTrace();
+                        }
+                    } catch (NccAccountsException e) {
+                        logger.error(e.getMessage() + " for userId=" + userData.id);
+                    }
+
+                } catch (NccUsersException e) {
+                    logger.info("User not found: '" + reqUserName + "'");
+                }
+
+                radiusPacket.setPacketIdentifier(reqPacketIdentifier);
+                radiusPacket.setPacketType(packetType);
+
+                logger.debug("Response time: " + new DecimalFormat("#.#########").format((double) (System.nanoTime() - startTime) / 1000000000) + " sec.");
+
+            }
         }
 
-        radiusPacket.setPacketIdentifier(reqPacketIdentifier);
-        radiusPacket.setPacketType(packetType);
+        AccessThread accessThread = new AccessThread();
+        Thread thread = new Thread(accessThread);
+        thread.start();
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
-        logger.debug("Response time: " + new DecimalFormat("#.#########").format((double) (System.nanoTime() - startTime) / 1000000000) + " sec.");
-
-        return radiusPacket;
+        return accessThread.getValue();
     }
 
     public void startServer() {

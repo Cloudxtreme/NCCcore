@@ -63,12 +63,12 @@ public class NccDhcpServer {
 
                         Thread dhcpReceiveThread = new Thread(new Runnable() {
 
-                            boolean checkBind(String remoteID, String circuitID, String clientMAC, Long relayAgent) {
+                            NccDhcpBindData checkBind(String remoteID, String circuitID, String clientMAC, Long relayAgent) {
                                 NccDhcpBindData bindData = new NccDhcpBinding().getBinding(remoteID, circuitID, clientMAC, relayAgent);
 
                                 if (bindData != null) {
                                     logger.debug("User binded: uid=" + bindData.uid);
-                                    return true;
+                                    return bindData;
                                 } else {
                                     try {
                                         logger.debug("Unbinded user: remoteID=" + remoteID + " circuitID=" + circuitID + " clientMAC=" + clientMAC + " relayAgent=" + NccUtils.long2ip(relayAgent));
@@ -77,7 +77,7 @@ public class NccDhcpServer {
                                     }
                                     if (!remoteID.equals(""))
                                         new NccDhcpBinding().setUnbinded(remoteID, circuitID, clientMAC, relayAgent);
-                                    return false;
+                                    return null;
                                 }
                             }
 
@@ -115,7 +115,8 @@ public class NccDhcpServer {
                                             return;
                                         }
 
-                                        if (!checkBind(remoteID, circuitID, clientMAC, relayAgent)) return;
+                                        NccDhcpBindData bindData = checkBind(remoteID, circuitID, clientMAC, relayAgent);
+                                        if (bindData == null) return;
 
                                         try {
 
@@ -127,7 +128,7 @@ public class NccDhcpServer {
                                                     logger.debug("Found pool for relay agent: " + poolData.poolName);
                                                 }
 
-                                                NccDhcpLeaseData leaseData = new NccDhcpLeases().allocateLease(poolData, clientMAC, remoteID, NccUtils.ip2long(agentIP.getHostAddress()));
+                                                NccDhcpLeaseData leaseData = new NccDhcpLeases().allocateLease(bindData.uid, poolData, clientMAC, remoteID, circuitID, NccUtils.ip2long(agentIP.getHostAddress()));
 
                                                 if (leaseData != null) {
                                                     logger.debug("Offered IP: " + NccUtils.long2ip(leaseData.leaseIP));
@@ -184,7 +185,8 @@ public class NccDhcpServer {
                                             return;
                                         }
 
-                                        if (!checkBind(remoteID, circuitID, clientMAC, relayAgent)) return;
+                                        NccDhcpBindData bindData = checkBind(remoteID, circuitID, clientMAC, relayAgent);
+                                        if (bindData == null) return;
 
                                         InetAddress clientIP = pkt.getClientIPAddress();
                                         InetAddress reqIP = pkt.getAddressRequest();
@@ -211,7 +213,7 @@ public class NccDhcpServer {
                                             logger.debug("Lease RENEW");
 
                                             try {
-                                                lease = new NccDhcpLeases().acceptLease(NccUtils.ip2long(clientIP.getHostAddress()), clientMAC, remoteID);
+                                                lease = new NccDhcpLeases().acceptLease(NccUtils.ip2long(clientIP.getHostAddress()), clientMAC, remoteID, circuitID);
                                             } catch (UnknownHostException e) {
                                                 e.printStackTrace();
                                             }
@@ -221,7 +223,7 @@ public class NccDhcpServer {
                                             logger.debug("Lease ACCEPT");
 
                                             try {
-                                                lease = new NccDhcpLeases().acceptLease(NccUtils.ip2long(reqIP.getHostAddress()), clientMAC, remoteID);
+                                                lease = new NccDhcpLeases().acceptLease(NccUtils.ip2long(reqIP.getHostAddress()), clientMAC, remoteID, circuitID);
                                             } catch (UnknownHostException e) {
                                                 e.printStackTrace();
                                             }

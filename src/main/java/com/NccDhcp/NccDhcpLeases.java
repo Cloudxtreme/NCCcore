@@ -44,6 +44,7 @@ public class NccDhcpLeases {
                     "leaseDNS2, " +
                     "leaseClientMAC, " +
                     "leaseRemoteID, " +
+                    "leaseCircuitID, " +
                     "leaseRelayAgent, " +
                     "leasePool FROM ncc_dhcp_leases" + whereId);
         } catch (NccQueryException e) {
@@ -68,6 +69,7 @@ public class NccDhcpLeases {
                     leaseData.leaseDNS2 = rs.getLong("leaseDNS2");
                     leaseData.leaseClientMAC = rs.getString("leaseClientMAC");
                     leaseData.leaseRemoteID = rs.getString("leaseRemoteID");
+                    leaseData.leaseCircuitID = rs.getString("leaseCircuitID");
                     leaseData.leaseRelayAgent = rs.getLong("leaseRelayAgent");
                     leaseData.leasePool = rs.getInt("leasePool");
 
@@ -83,7 +85,7 @@ public class NccDhcpLeases {
         return null;
     }
 
-    public NccDhcpLeaseData allocateLease(NccDhcpPoolData poolData, String clientMAC, String remoteID, Long RelayAgent) throws NccDhcpException {
+    public NccDhcpLeaseData allocateLease(Integer uid, NccDhcpPoolData poolData, String clientMAC, String remoteID, String circuitID, Long RelayAgent) throws NccDhcpException {
 
         try {
             ArrayList<NccDhcpLeaseData> leases = getLeases();
@@ -115,8 +117,10 @@ public class NccDhcpLeases {
                                 "leaseDNS2, " +
                                 "leaseClientMAC, " +
                                 "leaseRemoteID, " +
+                                "leaseCircuitID, " +
                                 "leaseRelayAgent, " +
                                 "leaseStatus, " +
+                                "leaseUID, " +
                                 "leasePool) VALUES (" +
                                 leaseStart + ", " +
                                 leaseExpire + ", " +
@@ -127,8 +131,10 @@ public class NccDhcpLeases {
                                 poolData.poolDNS2 + ", " +
                                 "'" + clientMAC + "', " +
                                 "'" + remoteID + "', " +
+                                "'" + circuitID + "', " +
                                 RelayAgent + ", " +
                                 "0, " +
+                                uid +", " +
                                 poolData.id +
                                 ")");
 
@@ -143,6 +149,7 @@ public class NccDhcpLeases {
                             newLease.leaseDNS2 = poolData.poolDNS2;
                             newLease.leaseClientMAC = clientMAC;
                             newLease.leaseRemoteID = remoteID;
+                            newLease.leaseCircuitID = circuitID;
                             newLease.leaseRelayAgent = RelayAgent;
                             newLease.leasePool = poolData.id;
 
@@ -164,7 +171,7 @@ public class NccDhcpLeases {
         return null;
     }
 
-    public NccDhcpLeaseData acceptLease(Long clientIP, String clientMAC, String remoteID) {
+    public NccDhcpLeaseData acceptLease(Long clientIP, String clientMAC, String remoteID, String circuitID) {
 
         CachedRowSetImpl rs;
 
@@ -172,12 +179,14 @@ public class NccDhcpLeases {
             logger.debug("SELECT id FROM ncc_dhcp_leases WHERE " +
                     "leaseIP=" + clientIP + " AND " +
                     "leaseClientMAC='" + clientMAC + "' AND " +
-                    "leaseRemoteID='" + remoteID + "'");
+                    "leaseRemoteID='" + remoteID + "' AND " +
+                    "leaseCircuitID='" + circuitID + "'");
 
             rs = query.selectQuery("SELECT id FROM ncc_dhcp_leases WHERE " +
                     "leaseIP=" + clientIP + " AND " +
                     "leaseClientMAC='" + clientMAC + "' AND " +
-                    "leaseRemoteID='" + remoteID + "'");
+                    "leaseRemoteID='" + remoteID + "' AND " +
+                    "leaseCircuitID='" + circuitID + "'");
 
             if (rs != null) {
                 try {
@@ -216,7 +225,7 @@ public class NccDhcpLeases {
         return null;
     }
 
-    public void releaseLease(){
+    public void releaseLease() {
 
     }
 
