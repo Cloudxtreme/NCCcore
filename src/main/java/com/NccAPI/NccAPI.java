@@ -178,6 +178,11 @@ public class NccAPI {
         }
     }
 
+    public boolean checkKey(String apiKey){
+        if(apiKey.equals("CtrhtnT,fnmRfrjq")) return true;
+        return false;
+    }
+
     public boolean checkPermission(String apiKey, String permission){
         String login = "admin";
         String password = "CtrhtnysqGfhjkm";

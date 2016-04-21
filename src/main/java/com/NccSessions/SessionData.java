@@ -14,4 +14,7 @@ public class SessionData {
     public Long framedIP;
     public String framedMAC;
     public Integer userId;
+    public Long framedAgentId;
+    public String framedCircuitId;
+    public String framedRemoteId;
 }

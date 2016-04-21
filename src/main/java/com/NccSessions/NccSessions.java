@@ -25,6 +25,34 @@ public class NccSessions {
         }
     }
 
+    private SessionData fillSessionData(CachedRowSetImpl rs) {
+        if (rs != null) {
+            SessionData sessionData = new SessionData();
+
+            try {
+                sessionData.id = rs.getInt("id");
+                sessionData.sessionId = rs.getString("sessionId");
+                sessionData.startTime = rs.getLong("startTime");
+                sessionData.acctInputOctets = rs.getInt("acctInputOctets");
+                sessionData.acctOutputOctets = rs.getInt("acctOutputOctets");
+                sessionData.nasId = rs.getInt("nasId");
+                sessionData.framedIP = rs.getLong("framedIP");
+                sessionData.framedMAC = rs.getString("framedMAC");
+                sessionData.framedAgentId = rs.getLong("framedAgentId");
+                sessionData.framedCircuitId = rs.getString("framedCircuitId");
+                sessionData.framedRemoteId = rs.getString("framedRemoteId");
+                sessionData.userId = rs.getInt("userId");
+                sessionData.lastAlive = rs.getLong("lastAlive");
+                sessionData.sessionDuration = rs.getLong("sessionDuration");
+
+                return sessionData;
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+        return null;
+    }
+
     public boolean isAllocated(ArrayList<SessionData> sessions, Long ip) {
         if (sessions != null) {
             for (SessionData session : sessions) {
@@ -49,7 +77,7 @@ public class NccSessions {
             for (PoolData pool : pools) {
                 if (pool != null) if (pool.poolStatus == 1) {
                     for (Long ip = pool.poolStart; ip <= pool.poolEnd; ip++) {
-                        if(!isAllocated(sessions, ip)) return ip;
+                        if (!isAllocated(sessions, ip)) return ip;
                     }
                 }
             }
@@ -57,6 +85,53 @@ public class NccSessions {
 
         return null;
     }
+
+//    public SessionData getSession(String sessionID) throws NccSessionsException {
+//
+//        CachedRowSetImpl rs;
+//
+//        try {
+//            rs = query.selectQuery("SELECT " +
+//                    "acct_session_id, " +
+//                    "UNIX_TIMESTAMP(started) AS started, " +
+//                    "acct_input_octets, " +
+//                    "acct_output_octets, " +
+//                    "nas_id, " +
+//                    "framed_ip_address, " +
+//                    "uid, " +
+//                    "lupdated, " +
+//                    "acct_session_time FROM dv_calls WHERE acct_session_id='" + StringEscapeUtils.escapeSql(sessionID) + "'");
+//
+//        } catch (NccQueryException e) {
+//            e.printStackTrace();
+//            throw new NccSessionsException("getSession error: " + e.getMessage());
+//        }
+//
+//        if (rs != null) {
+//            try {
+//                if (rs.next()) {
+//                    SessionData sessionData = new SessionData();
+//
+//                    sessionData.id = 0;
+//                    sessionData.sessionId = rs.getString("acct_session_id");
+//                    sessionData.startTime = rs.getLong("started");
+//                    sessionData.acctInputOctets = rs.getInt("acct_input_octets");
+//                    sessionData.acctOutputOctets = rs.getInt("acct_output_octets");
+//                    sessionData.nasId = rs.getInt("nas_id");
+//                    sessionData.framedIP = rs.getLong("framed_ip_address");
+//                    sessionData.userId = rs.getInt("uid");
+//                    sessionData.lastAlive = rs.getLong("lupdated");
+//                    sessionData.sessionDuration = rs.getLong("acct_session_time");
+//
+//                    return sessionData;
+//                }
+//            } catch (SQLException e) {
+//                e.printStackTrace();
+//            }
+//        }
+//
+//        return null;
+//    }
 
     public SessionData getSession(String sessionID) throws NccSessionsException {
 
@@ -70,6 +145,10 @@ public class NccSessions {
                     "acctOutputOctets, " +
                     "nasId, " +
                     "framedIP, " +
+                    "framedMAC, " +
+                    "framedAgentId, " +
+                    "framedCircuitId, " +
+                    "framedRemoteId, " +
                     "userId, " +
                     "lastAlive, " +
                     "sessionDuration FROM nccSessions WHERE sessionId='" + StringEscapeUtils.escapeSql(sessionID) + "'");
@@ -82,19 +161,46 @@ public class NccSessions {
         if (rs != null) {
             try {
                 if (rs.next()) {
-                    SessionData sessionData = new SessionData();
+                    SessionData sessionData = fillSessionData(rs);
+                    return sessionData;
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
 
-                    sessionData.id = rs.getInt("id");
-                    sessionData.sessionId = rs.getString("sessionId");
-                    sessionData.startTime = rs.getLong("startTime");
-                    sessionData.acctInputOctets = rs.getInt("acctInputOctets");
-                    sessionData.acctOutputOctets = rs.getInt("acctOutputOctets");
-                    sessionData.nasId = rs.getInt("nasId");
-                    sessionData.framedIP = rs.getLong("framedIP");
-                    sessionData.userId = rs.getInt("userId");
-                    sessionData.lastAlive = rs.getLong("lastAlive");
-                    sessionData.sessionDuration = rs.getLong("sessionDuration");
+        return null;
+    }
 
+    public SessionData getSession(Integer uid) throws NccSessionsException {
+
+        CachedRowSetImpl rs;
+
+        try {
+            rs = query.selectQuery("SELECT id, " +
+                    "sessionId, " +
+                    "startTime, " +
+                    "acctInputOctets, " +
+                    "acctOutputOctets, " +
+                    "nasId, " +
+                    "framedIP, " +
+                    "framedMAC, " +
+                    "framedAgentId, " +
+                    "framedCircuitId, " +
+                    "framedRemoteId, " +
+                    "userId, " +
+                    "lastAlive, " +
+                    "sessionDuration FROM nccSessions WHERE userId=" + uid);
+
+        } catch (NccQueryException e) {
+            e.printStackTrace();
+            throw new NccSessionsException("getSession error: " + e.getMessage());
+        }
+
+        if (rs != null) {
+            try {
+                if (rs.next()) {
+                    SessionData sessionData = fillSessionData(rs);
                     return sessionData;
                 }
             } catch (SQLException e) {
@@ -117,6 +223,10 @@ public class NccSessions {
                     "acctOutputOctets, " +
                     "nasId, " +
                     "framedIP, " +
+                    "framedMAC, " +
+                    "framedAgentId, " +
+                    "framedCircuitId, " +
+                    "framedRemoteId, " +
                     "userId, " +
                     "lastAlive, " +
                     "sessionDuration FROM nccSessions");
@@ -131,19 +241,7 @@ public class NccSessions {
                 ArrayList<SessionData> sessions = new ArrayList<>();
 
                 while (rs.next()) {
-                    SessionData sessionData = new SessionData();
-
-                    sessionData.id = rs.getInt("id");
-                    sessionData.sessionId = rs.getString("sessionId");
-                    sessionData.startTime = rs.getLong("startTime");
-                    sessionData.acctInputOctets = rs.getInt("acctInputOctets");
-                    sessionData.acctOutputOctets = rs.getInt("acctOutputOctets");
-                    sessionData.nasId = rs.getInt("nasId");
-                    sessionData.framedIP = rs.getLong("framedIP");
-                    sessionData.userId = rs.getInt("userId");
-                    sessionData.lastAlive = rs.getLong("lastAlive");
-                    sessionData.sessionDuration = rs.getLong("sessionDuration");
-
+                    SessionData sessionData = fillSessionData(rs);
                     sessions.add(sessionData);
                 }
 
@@ -171,7 +269,10 @@ public class NccSessions {
                     "framedMAC, " +
                     "userId, " +
                     "lastAlive, " +
-                    "sessionDuration" +
+                    "sessionDuration, " +
+                    "framedAgentId, " +
+                    "framedCircuitId, " +
+                    "framedRemoteId" +
                     ") VALUES (" +
                     "'" + sessionData.sessionId + "', " +
                     sessionData.startTime + ", " +
@@ -182,7 +283,11 @@ public class NccSessions {
                     "'" + sessionData.framedMAC + "', " +
                     sessionData.userId + ", " +
                     sessionData.lastAlive + ", " +
-                    sessionData.sessionDuration + ")");
+                    sessionData.sessionDuration + ", " +
+                    sessionData.framedAgentId + ", " +
+                    "'" + sessionData.framedCircuitId + "', " +
+                    "'" + sessionData.framedRemoteId + "'" +
+                    ")");
 
             return ids;
 
@@ -207,16 +312,28 @@ public class NccSessions {
                     "terminateCause, " +
                     "nasId, " +
                     "framedIP, " +
+                    "framedMAC, " +
+                    "framedAgentId, " +
+                    "framedCircuitId, " +
+                    "framedRemoteId, " +
+                    "lastAlive, " +
+                    "sessionDuration, " +
                     "sessionId) VALUES (" +
                     sessionData.userId + ", " +
                     sessionData.startTime + ", " +
-                    sessionData.stopTime + ", " +
+                    "UNIX_TIMESTAMP(), " +
                     sessionData.acctInputOctets + ", " +
                     sessionData.acctOutputOctets + ", " +
                     sessionData.terminateCause + ", " +
                     sessionData.nasId + ", " +
-                    sessionData.framedIP + ", '" +
-                    sessionData.sessionId + "')");
+                    sessionData.framedIP + ", " +
+                    "'" + sessionData.framedMAC + "', " +
+                    sessionData.framedAgentId + ", " +
+                    "'" + sessionData.framedCircuitId + "', " +
+                    "'" + sessionData.framedRemoteId + "', " +
+                    sessionData.lastAlive + ", " +
+                    sessionData.sessionDuration + ", " +
+                    "'" + sessionData.sessionId + "')");
 
             ArrayList<Integer> idsDelete = query.updateQuery("DELETE FROM nccSessions WHERE id=" + sessionData.id);
 
@@ -264,25 +381,18 @@ public class NccSessions {
                     "terminateCause, " +
                     "nasId, " +
                     "framedIP, " +
+                    "framedMAC, " +
+                    "framedAgentId, " +
+                    "framedCircuitId, " +
+                    "framedRemoteId, " +
+                    "lastAlive, " +
+                    "sessionDuration, " +
                     "sessionId FROM nccSessionsLog WHERE sessionId='" + StringEscapeUtils.escapeSql(sessionID) + "'");
 
             if (rs != null) {
                 try {
                     if (rs.next()) {
-                        SessionData sessionData = new SessionData();
-
-                        sessionData.id = rs.getInt("id");
-                        sessionData.userId = rs.getInt("userId");
-                        sessionData.startTime = rs.getLong("startTime");
-                        sessionData.stopTime = rs.getLong("stopTime");
-                        sessionData.acctInputOctets = rs.getInt("acctInputOctets");
-                        sessionData.acctOutputOctets = rs.getInt("acctOutputOctets");
-                        sessionData.terminateCause = rs.getInt("terminateCause");
-                        sessionData.nasId = rs.getInt("nasId");
-                        sessionData.framedIP = rs.getLong("framedIP");
-                        sessionData.sessionId = rs.getString("sessionId");
-
-                        return sessionData;
+                        return fillSessionData(rs);
                     }
                 } catch (SQLException e) {
                     e.printStackTrace();

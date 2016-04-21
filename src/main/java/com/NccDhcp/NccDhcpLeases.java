@@ -21,6 +21,41 @@ public class NccDhcpLeases {
         }
     }
 
+    private ArrayList<NccDhcpLeaseData> fillLeaseData(CachedRowSetImpl rs) {
+        if (rs != null) {
+            try {
+                ArrayList<NccDhcpLeaseData> leases = new ArrayList<>();
+
+                while (rs.next()) {
+                    NccDhcpLeaseData leaseData = new NccDhcpLeaseData();
+
+                    leaseData.id = rs.getInt("id");
+                    leaseData.leaseStart = rs.getLong("leaseStart");
+                    leaseData.leaseExpire = rs.getLong("leaseExpire");
+                    leaseData.leaseIP = rs.getLong("leaseIP");
+                    leaseData.leaseRouter = rs.getLong("leaseRouter");
+                    leaseData.leaseNetmask = rs.getLong("leaseNetmask");
+                    leaseData.leaseDNS1 = rs.getLong("leaseDNS1");
+                    leaseData.leaseDNS2 = rs.getLong("leaseDNS2");
+                    leaseData.leaseClientMAC = rs.getString("leaseClientMAC");
+                    leaseData.leaseRemoteID = rs.getString("leaseRemoteID");
+                    leaseData.leaseCircuitID = rs.getString("leaseCircuitID");
+                    leaseData.leaseRelayAgent = rs.getLong("leaseRelayAgent");
+                    leaseData.leasePool = rs.getInt("leasePool");
+                    leaseData.leaseUID = rs.getInt("leaseUID");
+
+                    leases.add(leaseData);
+                }
+
+                return leases;
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return null;
+    }
+
     public ArrayList<NccDhcpLeaseData> getLeases() throws NccDhcpException {
         return getLeases(null);
     }
@@ -46,43 +81,15 @@ public class NccDhcpLeases {
                     "leaseRemoteID, " +
                     "leaseCircuitID, " +
                     "leaseRelayAgent, " +
+                    "leaseUID, " +
                     "leasePool FROM ncc_dhcp_leases" + whereId);
         } catch (NccQueryException e) {
             e.printStackTrace();
             throw new NccDhcpException("SQL error: " + e.getMessage());
         }
 
-        if (rs != null) {
-            try {
-                ArrayList<NccDhcpLeaseData> leases = new ArrayList<>();
 
-                while (rs.next()) {
-                    NccDhcpLeaseData leaseData = new NccDhcpLeaseData();
-
-                    leaseData.id = rs.getInt("id");
-                    leaseData.leaseStart = rs.getLong("leaseStart");
-                    leaseData.leaseExpire = rs.getLong("leaseExpire");
-                    leaseData.leaseIP = rs.getLong("leaseIP");
-                    leaseData.leaseRouter = rs.getLong("leaseRouter");
-                    leaseData.leaseNetmask = rs.getLong("leaseNetmask");
-                    leaseData.leaseDNS1 = rs.getLong("leaseDNS1");
-                    leaseData.leaseDNS2 = rs.getLong("leaseDNS2");
-                    leaseData.leaseClientMAC = rs.getString("leaseClientMAC");
-                    leaseData.leaseRemoteID = rs.getString("leaseRemoteID");
-                    leaseData.leaseCircuitID = rs.getString("leaseCircuitID");
-                    leaseData.leaseRelayAgent = rs.getLong("leaseRelayAgent");
-                    leaseData.leasePool = rs.getInt("leasePool");
-
-                    leases.add(leaseData);
-                }
-
-                return leases;
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
-        }
-
-        return null;
+        return fillLeaseData(rs);
     }
 
     public NccDhcpLeaseData allocateLease(Integer uid, NccDhcpPoolData poolData, String clientMAC, String remoteID, String circuitID, Long RelayAgent) throws NccDhcpException {
@@ -134,7 +141,7 @@ public class NccDhcpLeases {
                                 "'" + circuitID + "', " +
                                 RelayAgent + ", " +
                                 "0, " +
-                                uid +", " +
+                                uid + ", " +
                                 poolData.id +
                                 ")");
 
@@ -171,10 +178,96 @@ public class NccDhcpLeases {
         return null;
     }
 
+    public ArrayList<NccDhcpLeaseData> getLeaseByUid(Integer uid) throws NccDhcpException {
+        CachedRowSetImpl rs;
+
+        try {
+            rs = query.selectQuery("SELECT id, " +
+                    "leaseStart, " +
+                    "leaseExpire, " +
+                    "leaseIP, " +
+                    "leaseRouter, " +
+                    "leaseNetmask, " +
+                    "leaseDNS1, " +
+                    "leaseDNS2, " +
+                    "leaseClientMAC, " +
+                    "leaseRemoteID, " +
+                    "leaseCircuitID, " +
+                    "leaseRelayAgent, " +
+                    "leaseUID, " +
+                    "leasePool FROM ncc_dhcp_leases " +
+                    "WHERE uid=" + uid);
+        } catch (NccQueryException e) {
+            e.printStackTrace();
+            throw new NccDhcpException("SQL error: " + e.getMessage());
+        }
+
+        return fillLeaseData(rs);
+    }
+
+    public ArrayList<NccDhcpLeaseData> getLeaseByIP(Long ip) throws NccDhcpException {
+        CachedRowSetImpl rs;
+
+        try {
+            rs = query.selectQuery("SELECT id, " +
+                    "leaseStart, " +
+                    "leaseExpire, " +
+                    "leaseIP, " +
+                    "leaseRouter, " +
+                    "leaseNetmask, " +
+                    "leaseDNS1, " +
+                    "leaseDNS2, " +
+                    "leaseClientMAC, " +
+                    "leaseRemoteID, " +
+                    "leaseCircuitID, " +
+                    "leaseRelayAgent, " +
+                    "leaseUID, " +
+                    "leasePool FROM ncc_dhcp_leases " +
+                    "WHERE leaseIP=" + ip);
+        } catch (NccQueryException e) {
+            e.printStackTrace();
+            throw new NccDhcpException("SQL error: " + e.getMessage());
+        }
+
+        return fillLeaseData(rs);
+    }
+
+    public NccDhcpLeaseData getLeaseByMAC(Long relayAgent, String mac) {
+        CachedRowSetImpl rs;
+
+        try {
+            rs = query.selectQuery("SELECT id, " +
+                    "leaseStart, " +
+                    "leaseExpire, " +
+                    "leaseIP, " +
+                    "leaseRouter, " +
+                    "leaseNetmask, " +
+                    "leaseDNS1, " +
+                    "leaseDNS2, " +
+                    "leaseClientMAC, " +
+                    "leaseRemoteID, " +
+                    "leaseCircuitID, " +
+                    "leaseRelayAgent, " +
+                    "leaseUID, " +
+                    "leasePool FROM ncc_dhcp_leases " +
+                    "WHERE leaseClientMAC='" + mac + "' AND " +
+                    "leaseRelayAgent=" + relayAgent);
+
+            if (rs.size() > 0) {
+                return fillLeaseData(rs).get(0);
+            }
+        } catch (NccQueryException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
     public NccDhcpLeaseData acceptLease(Long clientIP, String clientMAC, String remoteID, String circuitID) {
 
         CachedRowSetImpl rs;
 
+        // TODO: 4/20/16 not needed to determine id of lease
         try {
             logger.debug("SELECT id FROM ncc_dhcp_leases WHERE " +
                     "leaseIP=" + clientIP + " AND " +
@@ -225,6 +318,18 @@ public class NccDhcpLeases {
         return null;
     }
 
+    public void renewLease(NccDhcpLeaseData leaseData) {
+
+        NccDhcpPoolData poolData = new NccDhcpPools().getPool(leaseData.leasePool);
+        Integer interim = poolData.poolLeaseTime;
+
+        try {
+            query.updateQuery("UPDATE ncc_dhcp_leases SET leaseStatus=1, leaseExpire=UNIX_TIMESTAMP(NOW())+" + interim + " WHERE leaseRelayAgent=" + leaseData.leaseRelayAgent + " AND leaseClientMAC='" + leaseData.leaseClientMAC + "'");
+        } catch (NccQueryException e) {
+            e.printStackTrace();
+        }
+    }
+
     public void releaseLease() {
 
     }
@@ -233,7 +338,7 @@ public class NccDhcpLeases {
         Long cleanupTime = System.currentTimeMillis() / 1000L;
 
         try {
-            ArrayList<Integer> ids = query.updateQuery("DELETE FROM ncc_dhcp_leases WHERE leaseExpire<" + cleanupTime);
+            ArrayList<Integer> ids = query.updateQuery("DELETE FROM ncc_dhcp_leases WHERE leaseExpire<UNIX_TIMESTAMP(NOW())");
         } catch (NccQueryException e) {
             e.printStackTrace();
         }

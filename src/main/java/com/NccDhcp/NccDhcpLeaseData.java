@@ -14,4 +14,5 @@ public class NccDhcpLeaseData {
     public String leaseCircuitID;
     public Long leaseRelayAgent;
     public Integer leasePool;
+    public Integer leaseUID;
 }

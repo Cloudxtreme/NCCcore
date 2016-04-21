@@ -71,14 +71,14 @@ public class NccDhcpPacket {
     private static int DHCP_OPTION_82_RELAY_AGENT = 82;
     private static int DHCP_OPTION_255 = 255;
 
-    public static byte DHCP_MSG_TYPE_DISCOVER = 1;
-    public static byte DHCP_MSG_TYPE_OFFER = 2;
-    public static byte DHCP_MSG_TYPE_REQUEST = 3;
-    public static byte DHCP_MSG_TYPE_DECLINE = 4;
-    public static byte DHCP_MSG_TYPE_ACK = 5;
-    public static byte DHCP_MSG_TYPE_NAK = 6;
-    public static byte DHCP_MSG_TYPE_RELEASE = 7;
-    public static byte DHCP_MSG_TYPE_INFORM = 8;
+    public static final byte DHCP_MSG_TYPE_DISCOVER = 1;
+    public static final byte DHCP_MSG_TYPE_OFFER = 2;
+    public static final byte DHCP_MSG_TYPE_REQUEST = 3;
+    public static final byte DHCP_MSG_TYPE_DECLINE = 4;
+    public static final byte DHCP_MSG_TYPE_ACK = 5;
+    public static final byte DHCP_MSG_TYPE_NAK = 6;
+    public static final byte DHCP_MSG_TYPE_RELEASE = 7;
+    public static final byte DHCP_MSG_TYPE_INFORM = 8;
 
     private static int DHCP_RELAY_AGENT_CIRCUIT_ID = 1;
     private static int DHCP_RELAY_AGENT_REMOTE_ID = 2;
@@ -229,6 +229,30 @@ public class NccDhcpPacket {
                 continue;
             }
 
+        }
+    }
+
+    public String type2string(byte type){
+
+        switch (type){
+            case DHCP_MSG_TYPE_DISCOVER:
+                return "DHCPDISCOVER";
+            case DHCP_MSG_TYPE_REQUEST:
+                return "DHCPREQUEST";
+            case DHCP_MSG_TYPE_DECLINE:
+                return "DHCPDECLINE";
+            case DHCP_MSG_TYPE_OFFER:
+                return "DHCPOFFER";
+            case DHCP_MSG_TYPE_RELEASE:
+                return "DHCPRELEASE";
+            case DHCP_MSG_TYPE_INFORM:
+                return "DHCPINFORM";
+            case DHCP_MSG_TYPE_ACK:
+                return "DHCPACK";
+            case DHCP_MSG_TYPE_NAK:
+                return "DHCPNAK";
+            default:
+                return "unknown";
         }
     }
 
@@ -424,8 +448,8 @@ public class NccDhcpPacket {
         p += clientIP.getAddress().length;
 
         // next server
-        data = baInsert(data, p, localIP.getAddress());
-        p += localIP.getAddress().length;
+        data = baInsert(data, p, router.getAddress());
+        p += router.getAddress().length;
 
         // relay agent
         data = baInsert(data, p, this.dhcpRelayAgentIP);
@@ -489,8 +513,8 @@ public class NccDhcpPacket {
         // dhcp server
         data = baInsert(data, p, opt54);
         p += opt54.length;
-        data = baInsert(data, p, localIP.getAddress());
-        p += localIP.getAddress().length;
+        data = baInsert(data, p, router.getAddress());
+        p += router.getAddress().length;
 
         // opt61
 //        if (this.dhcpRawOpt61 != null) {

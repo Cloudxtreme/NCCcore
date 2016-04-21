@@ -81,11 +81,61 @@ public class NccDhcpServer {
                                 }
                             }
 
+                            DatagramPacket sendReply(byte type, Long localIP, Long leaseIP, Long leaseNetmask, Long leaseRouter, Long leaseDNS1, int leaseTime) {
+                                NccDhcpPacket pkt = null;
+                                try {
+                                    pkt = new NccDhcpPacket(recv, inPkt.getLength());
+                                } catch (NccDhcpException e) {
+                                    e.printStackTrace();
+                                }
+
+                                InetAddress ip = null;
+                                InetAddress netmask = null;
+                                InetAddress router = null;
+                                InetAddress dns = null;
+                                try {
+                                    ip = InetAddress.getByName(NccUtils.long2ip(leaseIP));
+                                    netmask = InetAddress.getByName(NccUtils.long2ip(leaseNetmask));
+                                    router = InetAddress.getByName(NccUtils.long2ip(leaseRouter));
+                                    dns = InetAddress.getByName(NccUtils.long2ip(leaseDNS1));
+                                } catch (UnknownHostException e) {
+                                    e.printStackTrace();
+                                }
+
+                                byte[] dhcpReply = null;
+
+                                try {
+                                    dhcpReply = pkt.buildReply(type, InetAddress.getByName(NccUtils.long2ip(localIP)), ip, netmask, router, dns, leaseTime);
+                                } catch (UnknownHostException e) {
+                                    e.printStackTrace();
+                                }
+
+                                logger.debug("Send " + pkt.type2string(type) + " to " + inPkt.getAddress().getHostAddress() + ":" + inPkt.getPort());
+
+                                try {
+                                    DatagramPacket outPkt = new DatagramPacket(dhcpReply, dhcpReply.length, inPkt.getAddress(), 67);
+                                    dhcpSocket.send(outPkt);
+
+                                    return outPkt;
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+
+                                return null;
+                            }
+
                             @Override
                             public void run() {
 
                                 try {
                                     NccDhcpPacket pkt = new NccDhcpPacket(recv, inPkt.getLength());
+
+                                    Long nullIP = null;
+                                    try {
+                                        nullIP = NccUtils.ip2long("0.0.0.0");
+                                    } catch (UnknownHostException e) {
+                                        e.printStackTrace();
+                                    }
 
                                     if (pkt.getType() == NccDhcpPacket.DHCP_MSG_TYPE_DISCOVER) {
 
@@ -93,12 +143,14 @@ public class NccDhcpServer {
 
                                         logger.debug("RelayAgent: " + pkt.getRelayAgent().getHostAddress() + " remoteID: " + pkt.getOpt82RemoteID() + " circuitID: " + pkt.getOpt82CircuitID() + " clientID: " + pkt.getClientID());
 
+                                        // TODO: 4/20/16 set real local IP of outgoing iface
                                         InetAddress localIP = null;
                                         try {
-                                            localIP = InetAddress.getByName("93.170.48.8");
+                                            localIP = InetAddress.getByName("151.0.48.86");
                                         } catch (UnknownHostException e) {
                                             e.printStackTrace();
                                         }
+
                                         InetAddress agentIP = pkt.getRelayAgent();
                                         String clientMAC = pkt.getClientMAC();
                                         String remoteID = pkt.getOpt82RemoteID();
@@ -111,49 +163,73 @@ public class NccDhcpServer {
                                         }
 
                                         if (remoteID.equals("")) {
-                                            logger.debug("Empty remoteID");
+                                            logger.debug("Empty remoteID in DHCPDISCOVER");
+                                            try {
+                                                sendReply(NccDhcpPacket.DHCP_MSG_TYPE_NAK, NccUtils.ip2long(localIP.getHostAddress()), nullIP, nullIP, nullIP, nullIP, 0);
+                                            } catch (UnknownHostException e) {
+                                                e.printStackTrace();
+                                            }
                                             return;
                                         }
 
                                         NccDhcpBindData bindData = checkBind(remoteID, circuitID, clientMAC, relayAgent);
-                                        if (bindData == null) return;
-
-                                        try {
-
-                                            NccDhcpRelayAgentData agentData = new NccDhcpRelayAgents().getAgentByIP(NccUtils.ip2long(agentIP.getHostAddress()));
-                                            if (agentData != null) {
-                                                NccDhcpPoolData poolData = new NccDhcpPools().getPool(agentData.agentPool);
-
-                                                if (poolData != null) {
-                                                    logger.debug("Found pool for relay agent: " + poolData.poolName);
-                                                }
-
-                                                NccDhcpLeaseData leaseData = new NccDhcpLeases().allocateLease(bindData.uid, poolData, clientMAC, remoteID, circuitID, NccUtils.ip2long(agentIP.getHostAddress()));
-
-                                                if (leaseData != null) {
-                                                    logger.debug("Offered IP: " + NccUtils.long2ip(leaseData.leaseIP));
-
-                                                    InetAddress ip = InetAddress.getByName(NccUtils.long2ip(leaseData.leaseIP));
-                                                    InetAddress netmask = InetAddress.getByName(NccUtils.long2ip(leaseData.leaseNetmask));
-                                                    InetAddress router = InetAddress.getByName(NccUtils.long2ip(leaseData.leaseRouter));
-                                                    InetAddress dns = InetAddress.getByName(NccUtils.long2ip(leaseData.leaseDNS1));
-
-                                                    byte[] dhcpReply = pkt.buildReply(NccDhcpPacket.DHCP_MSG_TYPE_OFFER, localIP, ip, netmask, router, dns, poolData.poolLeaseTime);
-
-                                                    logger.debug("Send DHCPOFFER to " + inPkt.getAddress().getHostAddress() + ":" + inPkt.getPort());
-                                                    DatagramPacket outPkt = new DatagramPacket(dhcpReply, dhcpReply.length, inPkt.getAddress(), 67);
-                                                    try {
-                                                        dhcpSocket.send(outPkt);
-                                                    } catch (IOException e) {
-                                                        logger.error("Can't write to socket");
-                                                    }
-                                                }
-                                            } else {
-                                                logger.debug("Pool for relay agent " + NccUtils.long2ip(relayAgent) + " not found");
+                                        if (bindData == null) {
+                                            logger.error("User not binded in DHCPDISCOVER");
+                                            try {
+                                                sendReply(NccDhcpPacket.DHCP_MSG_TYPE_NAK, NccUtils.ip2long(localIP.getHostAddress()), nullIP, nullIP, nullIP, nullIP, 0);
+                                            } catch (UnknownHostException e) {
+                                                e.printStackTrace();
                                             }
+                                            return;
+                                        }
 
-                                        } catch (UnknownHostException e) {
-                                            e.printStackTrace();
+                                        NccDhcpLeaseData leaseData = new NccDhcpLeases().getLeaseByMAC(relayAgent, clientMAC);
+
+                                        if (leaseData != null) {
+
+                                            logger.debug("Found lease for " + relayAgent.toString() + " " + clientMAC);
+
+                                            NccDhcpPoolData poolData = new NccDhcpPools().getPool(leaseData.leasePool);
+
+                                            try {
+                                                sendReply(NccDhcpPacket.DHCP_MSG_TYPE_OFFER, NccUtils.ip2long(localIP.getHostAddress()), leaseData.leaseIP, leaseData.leaseNetmask, leaseData.leaseRouter, leaseData.leaseDNS1, poolData.poolLeaseTime);
+                                                return;
+                                            } catch (UnknownHostException e) {
+                                                e.printStackTrace();
+                                            }
+                                        } else {
+
+                                            try {
+                                                NccDhcpRelayAgentData agentData = new NccDhcpRelayAgents().getAgentByIP(NccUtils.ip2long(agentIP.getHostAddress()));
+
+                                                if (agentData != null) {
+                                                    NccDhcpPoolData poolData = new NccDhcpPools().getPool(agentData.agentPool);
+
+                                                    if (poolData != null) {
+                                                        leaseData = new NccDhcpLeases().allocateLease(bindData.uid, poolData, clientMAC, remoteID, circuitID, NccUtils.ip2long(agentIP.getHostAddress()));
+
+                                                        if (leaseData != null) {
+                                                            sendReply(NccDhcpPacket.DHCP_MSG_TYPE_OFFER, NccUtils.ip2long(localIP.getHostAddress()), leaseData.leaseIP, leaseData.leaseNetmask, leaseData.leaseRouter, leaseData.leaseDNS1, poolData.poolLeaseTime);
+                                                            new NccDhcpLeases().renewLease(leaseData);
+                                                            return;
+                                                        } else {
+                                                            logger.error("Can't allocate lease");
+                                                            sendReply(NccDhcpPacket.DHCP_MSG_TYPE_NAK, NccUtils.ip2long(localIP.getHostAddress()), nullIP, nullIP, nullIP, nullIP, 0);
+                                                            return;
+                                                        }
+                                                    } else {
+                                                        logger.error("Pool for relay agent " + NccUtils.long2ip(relayAgent) + " not found");
+                                                        sendReply(NccDhcpPacket.DHCP_MSG_TYPE_NAK, NccUtils.ip2long(localIP.getHostAddress()), nullIP, nullIP, nullIP, nullIP, 0);
+                                                        return;
+                                                    }
+                                                } else {
+                                                    logger.debug("Relay agent " + NccUtils.long2ip(relayAgent) + " not found");
+                                                }
+                                                sendReply(NccDhcpPacket.DHCP_MSG_TYPE_NAK, NccUtils.ip2long(localIP.getHostAddress()), nullIP, nullIP, nullIP, nullIP, 0);
+                                                return;
+                                            } catch (UnknownHostException e) {
+                                                e.printStackTrace();
+                                            }
                                         }
                                     }
 
@@ -167,12 +243,18 @@ public class NccDhcpServer {
                                         String clientMAC = pkt.getClientMAC();
                                         String remoteID = pkt.getOpt82RemoteID();
                                         String circuitID = pkt.getOpt82CircuitID();
+
+                                        if (remoteID.equals("")) {
+                                            logger.debug("Empty remoteID");
+                                        }
+                                        // TODO: 4/20/16 set real local IP of outgoing iface
                                         InetAddress localIP = null;
                                         try {
-                                            localIP = InetAddress.getByName("93.170.48.8");
+                                            localIP = InetAddress.getByName("151.0.48.86");
                                         } catch (UnknownHostException e) {
                                             e.printStackTrace();
                                         }
+
                                         Long relayAgent = null;
                                         try {
                                             relayAgent = NccUtils.ip2long(agentIP.getHostAddress());
@@ -180,82 +262,109 @@ public class NccDhcpServer {
                                             e.printStackTrace();
                                         }
 
-                                        if (remoteID.equals("")) {
-                                            logger.debug("Empty remoteID");
-                                            return;
-                                        }
-
-                                        NccDhcpBindData bindData = checkBind(remoteID, circuitID, clientMAC, relayAgent);
-                                        if (bindData == null) return;
-
                                         InetAddress clientIP = pkt.getClientIPAddress();
                                         InetAddress reqIP = pkt.getAddressRequest();
 
-                                        byte[] dhcpReply;
-
-                                        InetAddress ip = null;
-                                        InetAddress netmask = null;
-                                        InetAddress router = null;
-                                        InetAddress dns = null;
-                                        try {
-                                            ip = InetAddress.getByName("0.0.0.0");
-                                            netmask = InetAddress.getByName("0.0.0.0");
-                                            router = InetAddress.getByName("0.0.0.0");
-                                            dns = InetAddress.getByName("0.0.0.0");
-                                        } catch (UnknownHostException e) {
-                                            e.printStackTrace();
-                                        }
-
-                                        NccDhcpLeaseData lease = null;
+                                        NccDhcpLeaseData leaseData = null;
 
                                         if (!clientIP.getHostAddress().equals("0.0.0.0")) {     // renew lease
 
                                             logger.debug("Lease RENEW");
 
-                                            try {
-                                                lease = new NccDhcpLeases().acceptLease(NccUtils.ip2long(clientIP.getHostAddress()), clientMAC, remoteID, circuitID);
-                                            } catch (UnknownHostException e) {
-                                                e.printStackTrace();
-                                            }
+                                            leaseData = new NccDhcpLeases().getLeaseByMAC(relayAgent, clientMAC);
 
+                                            if (leaseData != null) {
+
+                                                try {
+                                                    logger.debug("Found lease for " + NccUtils.long2ip(relayAgent) + " " + clientMAC);
+                                                } catch (UnknownHostException e) {
+                                                    e.printStackTrace();e.printStackTrace();
+                                                }
+
+                                                NccDhcpPoolData poolData = new NccDhcpPools().getPool(leaseData.leasePool);
+
+                                                if (poolData != null) {
+                                                    try {
+                                                        new NccDhcpLeases().renewLease(leaseData);
+                                                        sendReply(NccDhcpPacket.DHCP_MSG_TYPE_ACK, NccUtils.ip2long(localIP.getHostAddress()), leaseData.leaseIP, leaseData.leaseNetmask, leaseData.leaseRouter, leaseData.leaseDNS1, poolData.poolLeaseTime);
+                                                        return;
+                                                    } catch (UnknownHostException e) {
+                                                        e.printStackTrace();
+                                                    }
+
+                                                } else {
+                                                    logger.error("Pool " + leaseData.leasePool + " not found");
+                                                    try {
+                                                        sendReply(NccDhcpPacket.DHCP_MSG_TYPE_NAK, NccUtils.ip2long(localIP.getHostAddress()), nullIP, nullIP, nullIP, nullIP, 0);
+                                                        return;
+                                                    } catch (UnknownHostException e) {
+                                                        e.printStackTrace();
+                                                    }
+                                                    return;
+                                                }
+
+                                            } else {
+                                                logger.error("Lease for " + clientMAC + "not found");
+                                                try {
+                                                    sendReply(NccDhcpPacket.DHCP_MSG_TYPE_NAK, NccUtils.ip2long(localIP.getHostAddress()), nullIP, nullIP, nullIP, nullIP, 0);
+                                                    return;
+                                                } catch (UnknownHostException e) {
+                                                    e.printStackTrace();
+                                                }
+                                                return;
+                                            }
                                         } else if (reqIP != null) { // accept new lease
 
                                             logger.debug("Lease ACCEPT");
 
+                                            if (remoteID.equals("")) {
+                                                logger.debug("Empty remoteID in DHCPREQUEST");
+                                                try {
+                                                    sendReply(NccDhcpPacket.DHCP_MSG_TYPE_NAK, NccUtils.ip2long(localIP.getHostAddress()), nullIP, nullIP, nullIP, nullIP, 0);
+                                                } catch (UnknownHostException e) {
+                                                    e.printStackTrace();
+                                                }
+                                                return;
+                                            }
+
+                                            NccDhcpBindData bindData = checkBind(remoteID, circuitID, clientMAC, relayAgent);
+                                            if (bindData == null) {
+                                                logger.error("User not binded in DHCPREQUEST");
+                                                try {
+                                                    sendReply(NccDhcpPacket.DHCP_MSG_TYPE_NAK, NccUtils.ip2long(localIP.getHostAddress()), nullIP, nullIP, nullIP, nullIP, 0);
+                                                } catch (UnknownHostException e) {
+                                                    e.printStackTrace();
+                                                }
+                                                return;
+                                            }
+
                                             try {
-                                                lease = new NccDhcpLeases().acceptLease(NccUtils.ip2long(reqIP.getHostAddress()), clientMAC, remoteID, circuitID);
+                                                leaseData = new NccDhcpLeases().acceptLease(NccUtils.ip2long(reqIP.getHostAddress()), clientMAC, remoteID, circuitID);
+
+                                                if (leaseData != null) {
+
+                                                    NccDhcpPoolData poolData = new NccDhcpPools().getPool(leaseData.leasePool);
+
+                                                    try {
+                                                        sendReply(NccDhcpPacket.DHCP_MSG_TYPE_ACK, NccUtils.ip2long(localIP.getHostAddress()), leaseData.leaseIP, leaseData.leaseNetmask, leaseData.leaseRouter, leaseData.leaseDNS1, poolData.poolLeaseTime);
+                                                        return;
+                                                    } catch (UnknownHostException e) {
+                                                        e.printStackTrace();
+                                                    }
+                                                } else {
+                                                    logger.error("Lease not found for " + clientMAC);
+                                                    try {
+                                                        sendReply(NccDhcpPacket.DHCP_MSG_TYPE_NAK, NccUtils.ip2long(localIP.getHostAddress()), nullIP, nullIP, nullIP, nullIP, 0);
+                                                        return;
+                                                    } catch (UnknownHostException e) {
+                                                        e.printStackTrace();
+                                                    }
+                                                }
                                             } catch (UnknownHostException e) {
                                                 e.printStackTrace();
                                             }
                                         }
 
-                                        if (lease != null) {
-
-                                            try {
-                                                ip = InetAddress.getByName(NccUtils.long2ip(lease.leaseIP));
-                                                netmask = InetAddress.getByName(NccUtils.long2ip(lease.leaseNetmask));
-                                                router = InetAddress.getByName(NccUtils.long2ip(lease.leaseRouter));
-                                                dns = InetAddress.getByName(NccUtils.long2ip(lease.leaseDNS1));
-                                                logger.debug("Leased IP: " + NccUtils.long2ip(lease.leaseIP));
-                                            } catch (UnknownHostException e) {
-                                                e.printStackTrace();
-                                            }
-
-                                            NccDhcpPoolData poolData = new NccDhcpPools().getPool(lease.leasePool);
-
-                                            dhcpReply = pkt.buildReply(NccDhcpPacket.DHCP_MSG_TYPE_ACK, localIP, ip, netmask, router, dns, poolData.poolLeaseTime);
-                                        } else {
-                                            logger.error("Lease not found for " + clientMAC);
-                                            dhcpReply = pkt.buildReply(NccDhcpPacket.DHCP_MSG_TYPE_NAK, localIP, ip, netmask, router, dns, 300);
-                                        }
-
-                                        logger.debug("Send DHCPACK/NAK to " + inPkt.getAddress().getHostAddress() + ":" + inPkt.getPort());
-                                        DatagramPacket outPkt = new DatagramPacket(dhcpReply, dhcpReply.length, inPkt.getAddress(), 67);
-                                        try {
-                                            dhcpSocket.send(outPkt);
-                                        } catch (IOException e) {
-                                            logger.error("Can't write to socket");
-                                        }
                                     }
 
                                     if (pkt.getType() == NccDhcpPacket.DHCP_MSG_TYPE_RELEASE) {
@@ -263,11 +372,7 @@ public class NccDhcpServer {
                                         logger.debug("DHCPRELEASE from " + inPkt.getAddress().toString());
                                         logger.debug("RelayAgent: " + pkt.getRelayAgent().getHostAddress() + " remoteID: " + pkt.getOpt82RemoteID() + " circuitID: " + pkt.getOpt82CircuitID() + " clientID: " + pkt.getClientID());
                                     }
-                                } catch (
-                                        NccDhcpException e
-                                        )
-
-                                {
+                                } catch (NccDhcpException e) {
                                     e.printStackTrace();
                                 }
                             }

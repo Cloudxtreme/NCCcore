@@ -3,6 +3,9 @@ package com.NccRadius;
 import com.NccAccounts.AccountData;
 import com.NccAccounts.NccAccounts;
 import com.NccAccounts.NccAccountsException;
+import com.NccDhcp.NccDhcpException;
+import com.NccDhcp.NccDhcpLeaseData;
+import com.NccDhcp.NccDhcpLeases;
 import com.NccNAS.NccNAS;
 import com.NccNAS.NccNasData;
 import com.NccNAS.NccNasException;
@@ -12,6 +15,7 @@ import com.NccSessions.NccSessionsException;
 import com.NccSessions.SessionData;
 import com.NccSystem.NccUtils;
 import com.NccTariffScale.NccTariffScale;
+import com.NccTariffScale.RateData;
 import com.NccUsers.NccUsers;
 import com.NccUsers.NccUsersException;
 import com.NccUsers.UserData;
@@ -139,6 +143,7 @@ public class NccRadius extends RadiusServer {
                         radiusPacket.setPacketIdentifier(packetIdentifier);
 
                         String userLogin = "";
+                        Integer userId = 0;
                         String sessionID = "";
                         String nasPort = "";
                         String nasIP = "";
@@ -178,6 +183,61 @@ public class NccRadius extends RadiusServer {
                             e.printStackTrace();
                         }
 
+                        //NccDhcpLeases leases = new NccDhcpLeases();
+                        NccDhcpLeaseData leaseData = null;
+                        try {
+                            ArrayList<NccDhcpLeaseData> leases = new NccDhcpLeases().getLeaseByIP(NccUtils.ip2long(userLogin));
+                            if (leases.size() > 0) leaseData = leases.get(0);
+
+                            if (leaseData != null) {
+
+                                try {
+                                    UserData userData = new NccUsers().getUser(leaseData.leaseUID);
+
+                                    if (userData != null) {
+                                        userLogin = userData.userLogin;
+                                        userId = userData.id;
+                                    }
+                                } catch (NccUsersException e) {
+                                    e.printStackTrace();
+                                }
+                            } else {
+                                try {
+                                    SessionData sessionData = new NccSessions().getSession(sessionID);
+
+                                    if(sessionData!=null){
+                                        logger.info("No lease found for session: " + sessionID + " login: " + userLogin);
+                                        // TODO: 4/19/16 set correct Terminate-Cause 
+                                        sessionData.terminateCause = 0;
+                                        new NccSessions().stopSession(sessionData);
+                                        return;
+                                    }
+                                } catch (NccSessionsException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        } catch (NccDhcpException e) {
+                            e.printStackTrace();
+                        } catch (UnknownHostException e) {
+                            e.printStackTrace();
+                        }
+
+                        NccNasData nasData = null;
+                        try {
+                            try {
+                                nasData = new NccNAS().getNasByIP(NccUtils.ip2long(nasIP));
+
+                                if (nasData == null) {
+                                    logger.error("NAS not found: " + nasIP);
+                                    return;
+                                }
+                            } catch (UnknownHostException e) {
+                                e.printStackTrace();
+                            }
+                        } catch (NccNasException e) {
+                            e.printStackTrace();
+                        }
+
                         SessionData sessionData = new SessionData();
 
                         switch (statusType) {
@@ -195,8 +255,7 @@ public class NccRadius extends RadiusServer {
                                     e.printStackTrace();
                                 }
 
-                                // TODO: 21.01.2016 Get nasId from db
-                                sessionData.nasId = 1;
+                                sessionData.nasId = nasData.id;
 
                                 try {
                                     sessionData.framedIP = NccUtils.ip2long(framedIP);
@@ -204,6 +263,12 @@ public class NccRadius extends RadiusServer {
                                     e.printStackTrace();
                                 }
                                 sessionData.framedMAC = framedMAC;
+                                if (leaseData != null) {
+                                    sessionData.framedMAC = leaseData.leaseClientMAC;
+                                    sessionData.framedAgentId = leaseData.leaseRelayAgent;
+                                    sessionData.framedCircuitId = leaseData.leaseCircuitID;
+                                    sessionData.framedRemoteId = leaseData.leaseRemoteID;
+                                }
                                 sessionData.acctInputOctets = 0;
                                 sessionData.acctOutputOctets = 0;
                                 sessionData.sessionId = sessionID;
@@ -212,7 +277,7 @@ public class NccRadius extends RadiusServer {
                                 sessionData.sessionDuration = 0L;
 
                                 try {
-                                    UserData userData = new NccUsers().getUser(userLogin);
+                                    UserData userData = new NccUsers().getUser(userId);
                                     sessionData.userId = userData.id;
                                 } catch (NccUsersException e) {
                                     e.printStackTrace();
@@ -227,7 +292,7 @@ public class NccRadius extends RadiusServer {
                                 break;
                             case AccountingRequest.ACCT_STATUS_TYPE_STOP:
 
-                                logger.info("Session stop: '" + userLogin + "' sessionId=" + sessionID + " nasIP=" + nasIP + " nasPort=" + nasPort + " framedIP=" + framedIP);
+                                logger.info("Session stop: '" + userLogin + "' sessionId='" + sessionID + "' nasIP=" + nasIP + " nasPort=" + nasPort + " framedIP=" + framedIP);
 
                                 acctInputOctets = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Input-Octets"));
                                 acctOutputOctets = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Output-Octets"));
@@ -243,10 +308,10 @@ public class NccRadius extends RadiusServer {
                                 }
 
                                 if (sessionData != null) {
-                                    sessionData.nasId = 1;
+                                    sessionData.nasId = nasData.id;
 
                                     try {
-                                        UserData userData = new NccUsers().getUser(userLogin);
+                                        UserData userData = new NccUsers().getUser(userId);
                                         sessionData.userId = userData.id;
                                     } catch (NccUsersException e) {
                                         e.printStackTrace();
@@ -277,7 +342,7 @@ public class NccRadius extends RadiusServer {
                                 break;
                             case AccountingRequest.ACCT_STATUS_TYPE_INTERIM_UPDATE:
 
-                                logger.info("Session update: '" + userLogin + "' sessionId=" + sessionID + " nasIP=" + nasIP + " nasPort=" + nasPort + " framedIP=" + framedIP);
+                                logger.debug("Session update: '" + userLogin + "' sessionId=" + sessionID + " nasIP=" + nasIP + " nasPort=" + nasPort + " framedIP=" + framedIP);
 
                                 acctInputOctets = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Input-Octets"));
                                 acctOutputOctets = Integer.parseInt(accountingRequest.getAttributeValue("Acct-Output-Octets"));
@@ -288,7 +353,6 @@ public class NccRadius extends RadiusServer {
                                 try {
                                     sessionData = new NccSessions().getSession(sessionID);
                                 } catch (NccSessionsException e) {
-                                    System.out.println("getSession(" + sessionID + ")");
                                     e.printStackTrace();
                                 }
 
@@ -304,39 +368,23 @@ public class NccRadius extends RadiusServer {
                                         e.printStackTrace();
                                     }
                                 } else {
+
                                     logger.error("Session not found: '" + sessionID + "'");
                                     try {
-                                        SessionData resumeSession = new SessionData();
+                                        SessionData resumeSession = new NccSessions().getSessionFromLog(sessionID);
 
-                                        try {
-                                            resumeSession.framedIP = ip2long(framedIP);
-                                        } catch (UnknownHostException e) {
-                                            e.printStackTrace();
-                                        }
+                                        if(resumeSession!=null){
 
-                                        resumeSession.sessionId = sessionID;
-                                        resumeSession.acctInputOctets = acctInputOctets;
-                                        resumeSession.acctOutputOctets = acctOutputOctets;
-                                        // TODO: 21.01.2016 Get nasId from db
-                                        resumeSession.nasId = 1;
+                                            resumeSession.acctInputOctets = acctInputOctets;
+                                            resumeSession.acctOutputOctets = acctOutputOctets;
 
-                                        try {
-                                            UserData userData = new NccUsers().getUser(userLogin);
+                                            resumeSession.lastAlive = System.currentTimeMillis() / 1000L;
+                                            resumeSession.sessionDuration = Long.parseLong(acctSessionTime);
 
-                                            if (userData != null) {
-                                                resumeSession.userId = userData.id;
+                                            ArrayList<Integer> ids = new NccSessions().resumeSession(resumeSession);
+                                            if (ids != null) {
+                                                logger.info("Session '" + sessionID + "' resumed");
                                             }
-                                        } catch (NccUsersException e) {
-                                            e.printStackTrace();
-                                        }
-
-                                        resumeSession.lastAlive = System.currentTimeMillis() / 1000L;
-                                        resumeSession.sessionDuration = Long.parseLong(acctSessionTime);
-                                        resumeSession.startTime = resumeSession.lastAlive - resumeSession.sessionDuration;
-
-                                        ArrayList<Integer> ids = new NccSessions().resumeSession(resumeSession);
-                                        if (ids != null) {
-                                            logger.info("Session '" + sessionID + "' resumed");
                                         }
                                     } catch (NccSessionsException e) {
                                         e.printStackTrace();
@@ -411,13 +459,78 @@ public class NccRadius extends RadiusServer {
                 }
 
                 if (reqServiceType.equals("Outbound-User")) {
-                    packetType = RadiusPacket.ACCESS_ACCEPT;
-                    radiusPacket.addAttribute("avpair", "subscriber:accounting-list=ipoe-isg-aaa");
-                    radiusPacket.addAttribute("avpair", "ip:traffic-class=in access-group 101 priority 201");
-                    radiusPacket.addAttribute("avpair", "ip:traffic-class=out access-group 102 priority 201");
-                    radiusPacket.addAttribute("SSG-Service-Info", "QU;71680000;35840000;71680000;D;71680000;35840000;71680000");
+
+                    NccDhcpLeases leases = new NccDhcpLeases();
+                    try {
+                        NccDhcpLeaseData leaseData = leases.getLeaseByIP(NccUtils.ip2long(reqUserName)).get(0);
+                        if (leaseData != null) {
+
+                            try {
+                                UserData userData = new NccUsers().getUser(leaseData.leaseUID);
+
+                                if (userData != null) {
+
+                                    if (userData.userStatus == 0) {
+                                        packetType = RadiusPacket.ACCESS_REJECT;
+                                        logger.info("Login FAIL: [" + userData.userLogin + "] user disabled");
+                                        return;
+                                    }
+
+                                    if (userData.userDeposit <= -userData.userCredit) {
+                                        packetType = RadiusPacket.ACCESS_REJECT;
+                                        radiusPacket.setPacketIdentifier(reqPacketIdentifier);
+                                        radiusPacket.setPacketType(packetType);
+                                        logger.info("Login FAIL: [" + userData.userLogin + "] negative deposit");
+                                        return;
+                                    }
+
+                                    RateData rateData = new NccTariffScale().getRate(userData.userTariff);
+
+                                    if (rateData != null) {
+                                        Integer inRate = rateData.inRate * 1000;
+                                        Integer outRate = rateData.outRate * 1000;
+                                        Integer inBurst = inRate / 2;
+                                        Integer outBurst = outRate / 2;
+
+                                        radiusPacket.addAttribute("SSG-Service-Info", "QU;" + inRate + ";" + inBurst + ";" + inRate + ";D;" + outRate + ";" + outBurst + ";" + outRate);
+                                    }
+
+                                    packetType = RadiusPacket.ACCESS_ACCEPT;
+                                    radiusPacket.addAttribute("Acct-Interim-Interval", nasData.nasInterimInterval.toString());
+                                    radiusPacket.addAttribute("avpair", "subscriber:accounting-list=ipoe-isg-aaa");
+                                    radiusPacket.addAttribute("avpair", "ip:traffic-class=in access-group 101 priority 201");
+                                    radiusPacket.addAttribute("avpair", "ip:traffic-class=out access-group 102 priority 201");
+                                    radiusPacket.setPacketIdentifier(reqPacketIdentifier);
+                                    radiusPacket.setPacketType(packetType);
+                                    logger.info("Login OK: " + reqUserName + " [" + userData.userLogin + "]");
+                                    return;
+                                }
+
+                                packetType = RadiusPacket.ACCESS_REJECT;
+                                radiusPacket.setPacketIdentifier(reqPacketIdentifier);
+                                radiusPacket.setPacketType(packetType);
+                                logger.info("Login FAIL: [" + reqUserName + "] user not found");
+                            } catch (NccUsersException e) {
+                                e.printStackTrace();
+                            }
+
+                        } else {
+                            packetType = RadiusPacket.ACCESS_REJECT;
+                            radiusPacket.setPacketIdentifier(reqPacketIdentifier);
+                            radiusPacket.setPacketType(packetType);
+                            logger.info("Login FAIL: [" + reqUserName + "] lease not found");
+                        }
+
+                    } catch (NccDhcpException e) {
+                        e.printStackTrace();
+                    } catch (UnknownHostException e) {
+                        e.printStackTrace();
+                    }
+
+                    packetType = RadiusPacket.ACCESS_REJECT;
                     radiusPacket.setPacketIdentifier(reqPacketIdentifier);
                     radiusPacket.setPacketType(packetType);
+                    logger.info("Login FAIL: " + reqUserName);
                     return;
                 }
 

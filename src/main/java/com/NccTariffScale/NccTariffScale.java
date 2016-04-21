@@ -5,11 +5,66 @@ import com.NccPools.PoolData;
 import com.NccSystem.SQL.NccQuery;
 import com.NccSystem.SQL.NccQueryException;
 import com.sun.rowset.CachedRowSetImpl;
+import org.apache.log4j.Logger;
+import org.tinyradius.packet.RadiusPacket;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
 
 public class NccTariffScale {
+
+    private static Logger logger = Logger.getLogger(NccTariffScale.class);
+    private NccQuery query;
+
+    public NccTariffScale() {
+        try {
+            query = new NccQuery();
+        } catch (NccQueryException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public RateData getRate(Integer id) {
+
+        CachedRowSetImpl rs;
+
+        try {
+
+            logger.debug("SELECT " +
+                    "in_speed, " +
+                    "out_speed " +
+                    "FROM tarif_plans t " +
+                    "LEFT JOIN intervals i ON i.tp_id=t.tp_id " +
+                    "LEFT JOIN trafic_tarifs tt ON tt.interval_id=i.id " +
+                    "WHERE t.id=" + id);
+
+            rs = query.selectQuery("SELECT " +
+                    "in_speed, " +
+                    "out_speed " +
+                    "FROM tarif_plans t " +
+                    "LEFT JOIN intervals i ON i.tp_id=t.tp_id " +
+                    "LEFT JOIN trafic_tarifs tt ON tt.interval_id=i.id " +
+                    "WHERE t.id=" + id);
+
+            if (rs != null) {
+                try {
+                    if(rs.next()){
+                        RateData rateData = new RateData();
+                        rateData.inRate = rs.getInt("in_speed");
+                        rateData.outRate = rs.getInt("out_speed");
+
+                        return rateData;
+                    }
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        } catch (NccQueryException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
 
     public TariffData getTariffByUserId(Integer userId) {
 
@@ -52,11 +107,11 @@ public class NccTariffScale {
 
             rs = query.selectQuery("SELECT * FROM nccViewTariffPools WHERE tariffId=" + tariffId);
 
-            if(rs != null){
+            if (rs != null) {
                 try {
                     ArrayList<PoolData> tariffPools = new ArrayList<>();
 
-                    while (rs.next()){
+                    while (rs.next()) {
                         PoolData poolData = new PoolData();
 
                         poolData.id = rs.getInt("poolId");
